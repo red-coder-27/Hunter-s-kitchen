@@ -1,0 +1,40 @@
+import { Server } from 'http';
+import { outboxWorker } from '../workers/outboxWorker';
+import { eventHub } from '../services/eventHub';
+import { logger } from './logger';
+
+export function setupGracefulShutdown(server: Server) {
+  let isShuttingDown = false;
+
+  const handleShutdown = (signal: string) => {
+    if (isShuttingDown) return;
+    isShuttingDown = true;
+
+    logger.info(`Received ${signal}. Initiating graceful production shutdown...`);
+
+    // 1. Stop background workers
+    outboxWorker.stop();
+
+    // 2. Terminate real-time SSE streams cleanly
+    eventHub.closeAll();
+
+    // 3. Stop accepting new HTTP connections and drain active ones
+    server.close((err) => {
+      if (err) {
+        logger.error('Error closing HTTP server during shutdown', err);
+        process.exit(1);
+      }
+      logger.info('Closed all active HTTP connections cleanly. Exiting.');
+      process.exit(0);
+    });
+
+    // Force exit after 10s if connections refuse to drain
+    setTimeout(() => {
+      logger.warn('Graceful shutdown timeout exceeded (10s). Forcing termination.');
+      process.exit(1);
+    }, 10000).unref();
+  };
+
+  process.on('SIGTERM', () => handleShutdown('SIGTERM'));
+  process.on('SIGINT', () => handleShutdown('SIGINT'));
+}

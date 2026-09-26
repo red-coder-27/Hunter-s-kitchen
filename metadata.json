@@ -1,0 +1,6 @@
+{
+  "name": "Hunter's Kitchen",
+  "description": "Cloud kitchen food ordering and restaurant operations platform with 4 distinct roles: Customer, Staff, Admin, and Delivery Partner.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

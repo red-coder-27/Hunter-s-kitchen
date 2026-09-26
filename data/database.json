@@ -1,0 +1,4651 @@
+{
+  "settings": {
+    "restaurantName": "Hunter's Kitchen",
+    "phone": "+91 98765 00000",
+    "email": "contact@hunterskitchen.com",
+    "address": "42 Richmond Road, Shanthi Nagar, Bengaluru",
+    "isOpen": true,
+    "temporaryPause": false,
+    "openingTime": "11:00 AM",
+    "closingTime": "11:00 PM",
+    "deliveryRadiusKm": 10,
+    "baseDeliveryFee": 35,
+    "freeDeliveryThreshold": 500,
+    "codEnabled": true,
+    "onlinePaymentEnabled": true,
+    "announcement": "",
+    "pauseReason": ""
+  },
+  "users": [
+    {
+      "id": "usr_owner_1",
+      "name": "Chef Senthil (Owner)",
+      "email": "owner@hunterskitchen.com",
+      "phone": "+91 98765 43210",
+      "role": "OWNER",
+      "status": "ACTIVE",
+      "joinedAt": "2025-01-01T00:00:00Z",
+      "permissions": [
+        "orders.read",
+        "orders.create",
+        "orders.update",
+        "orders.cancel",
+        "orders.assign",
+        "orders.deliver",
+        "menu.read",
+        "menu.create",
+        "menu.update",
+        "menu.delete",
+        "menu.availability",
+        "users.read",
+        "users.create",
+        "users.update",
+        "users.suspend",
+        "analytics.read",
+        "audit.read",
+        "reconciliation.read",
+        "settings.update",
+        "batches.manage"
+      ],
+      "restaurantId": "rest_hunter_01"
+    },
+    {
+      "id": "usr_staff_1",
+      "name": "Manoj Kumar",
+      "email": "staff1@hunterskitchen.com",
+      "phone": "+91 98765 11111",
+      "role": "STAFF",
+      "status": "ACTIVE",
+      "joinedAt": "2025-02-10T00:00:00Z",
+      "staffRole": "KITCHEN_MANAGER",
+      "permissions": [
+        "orders.read",
+        "orders.update",
+        "orders.cancel",
+        "menu.read",
+        "menu.availability",
+        "batches.manage"
+      ],
+      "restaurantId": "rest_hunter_01"
+    },
+    {
+      "id": "usr_staff_2",
+      "name": "Kavitha Raj",
+      "email": "staff2@hunterskitchen.com",
+      "phone": "+91 98765 22222",
+      "role": "STAFF",
+      "status": "ACTIVE",
+      "joinedAt": "2025-03-01T00:00:00Z",
+      "staffRole": "FRONT_DESK",
+      "permissions": [
+        "orders.read",
+        "orders.create",
+        "orders.update",
+        "menu.read"
+      ],
+      "restaurantId": "rest_hunter_01"
+    },
+    {
+      "id": "usr_delivery_1",
+      "name": "Arun Kumar",
+      "email": "delivery1@hunterskitchen.com",
+      "phone": "+91 91234 56789",
+      "role": "DELIVERY_PARTNER",
+      "status": "ACTIVE",
+      "vehicleNumber": "TN-37-AB-1234",
+      "vehicleType": "Bike",
+      "currentRating": 4.8,
+      "totalDeliveries": 142,
+      "joinedAt": "2025-01-15T00:00:00Z",
+      "permissions": [
+        "orders.read",
+        "orders.deliver"
+      ],
+      "restaurantId": "rest_hunter_01"
+    },
+    {
+      "id": "usr_delivery_2",
+      "name": "Karthik Raja",
+      "email": "delivery2@hunterskitchen.com",
+      "phone": "+91 91234 56790",
+      "role": "DELIVERY_PARTNER",
+      "status": "ACTIVE",
+      "vehicleNumber": "TN-37-CD-5678",
+      "vehicleType": "Scooter",
+      "currentRating": 4.9,
+      "totalDeliveries": 98,
+      "joinedAt": "2025-02-01T00:00:00Z",
+      "permissions": [
+        "orders.read",
+        "orders.deliver"
+      ],
+      "restaurantId": "rest_hunter_01"
+    },
+    {
+      "id": "usr_delivery_3",
+      "name": "Vijay Anand",
+      "email": "delivery3@hunterskitchen.com",
+      "phone": "+91 91234 56791",
+      "role": "DELIVERY_PARTNER",
+      "status": "ACTIVE",
+      "vehicleNumber": "TN-37-EF-9012",
+      "vehicleType": "Bike",
+      "currentRating": 4.7,
+      "totalDeliveries": 210,
+      "joinedAt": "2025-01-20T00:00:00Z",
+      "permissions": [
+        "orders.read",
+        "orders.deliver"
+      ],
+      "restaurantId": "rest_hunter_01"
+    },
+    {
+      "id": "usr_delivery_4",
+      "name": "Suriya Prakash",
+      "email": "delivery4@hunterskitchen.com",
+      "phone": "+91 91234 56792",
+      "role": "DELIVERY_PARTNER",
+      "status": "INACTIVE",
+      "vehicleNumber": "TN-37-GH-3456",
+      "vehicleType": "Bike",
+      "currentRating": 4.6,
+      "totalDeliveries": 45,
+      "joinedAt": "2025-03-10T00:00:00Z",
+      "permissions": [
+        "orders.read",
+        "orders.deliver"
+      ],
+      "restaurantId": "rest_hunter_01"
+    },
+    {
+      "id": "usr_customer_1",
+      "name": "Priya Sundaram",
+      "email": "customer1@hunterskitchen.com",
+      "phone": "+91 99887 76655",
+      "role": "CUSTOMER",
+      "status": "ACTIVE",
+      "joinedAt": "2025-04-01T00:00:00Z",
+      "permissions": [
+        "orders.read",
+        "orders.create",
+        "orders.cancel",
+        "menu.read"
+      ],
+      "restaurantId": "rest_hunter_01"
+    },
+    {
+      "id": "usr_customer_2",
+      "name": "Rahul Sharma",
+      "email": "customer2@hunterskitchen.com",
+      "phone": "+91 99887 76644",
+      "role": "CUSTOMER",
+      "status": "ACTIVE",
+      "joinedAt": "2025-04-12T00:00:00Z",
+      "permissions": [
+        "orders.read",
+        "orders.create",
+        "orders.cancel",
+        "menu.read"
+      ],
+      "restaurantId": "rest_hunter_01"
+    },
+    {
+      "id": "usr_staff_3",
+      "name": "Saravanan (Head Chef)",
+      "email": "chef@hunterskitchen.com",
+      "phone": "+91 98765 33331",
+      "role": "STAFF",
+      "staffRole": "HEAD_CHEF",
+      "status": "ACTIVE",
+      "joinedAt": "2025-03-05T00:00:00Z",
+      "restaurantId": "rest_hunter_01",
+      "permissions": [
+        "orders.read",
+        "orders.update",
+        "menu.read",
+        "menu.availability"
+      ]
+    },
+    {
+      "id": "usr_staff_4",
+      "name": "Dinesh (Line Cook)",
+      "email": "cook@hunterskitchen.com",
+      "phone": "+91 98765 33332",
+      "role": "STAFF",
+      "staffRole": "LINE_COOK",
+      "status": "ACTIVE",
+      "joinedAt": "2025-03-12T00:00:00Z",
+      "restaurantId": "rest_hunter_01",
+      "permissions": [
+        "orders.read",
+        "orders.update"
+      ]
+    },
+    {
+      "id": "usr_staff_invited",
+      "name": "Ramesh Chef (Invited)",
+      "email": "invited@hunterskitchen.com",
+      "phone": "+91 98765 33333",
+      "role": "STAFF",
+      "staffRole": "LINE_COOK",
+      "status": "INVITED",
+      "joinedAt": "2025-04-15T00:00:00Z",
+      "restaurantId": "rest_hunter_01",
+      "permissions": [
+        "orders.read",
+        "orders.update"
+      ]
+    },
+    {
+      "id": "usr_suspended_1",
+      "name": "Suspended User",
+      "email": "suspended@hunterskitchen.com",
+      "phone": "+91 99887 00000",
+      "role": "CUSTOMER",
+      "status": "SUSPENDED",
+      "joinedAt": "2025-04-10T00:00:00Z",
+      "restaurantId": "rest_hunter_01",
+      "permissions": [
+        "orders.read",
+        "orders.create",
+        "orders.cancel",
+        "menu.read"
+      ]
+    }
+  ],
+  "categories": [
+    {
+      "id": "cat_biriyani",
+      "name": "Biriyani Specials",
+      "description": "Aromatic Seeraga Samba and Basmati rice delicacies cooked with authentic spices",
+      "icon": "🍲"
+    },
+    {
+      "id": "cat_starters",
+      "name": "Starters & Tandoori",
+      "description": "Crispy appetizers, kebabs, and juicy charcoal grilled delights",
+      "icon": "🍗"
+    },
+    {
+      "id": "cat_noodles",
+      "name": "Noodles",
+      "description": "Delicious stir-fried street-style and wok-tossed noodles",
+      "icon": "🍜"
+    },
+    {
+      "id": "cat_rice",
+      "name": "Rice Dishes",
+      "description": "Fragrant basmati fried rice and traditional rice items",
+      "icon": "🍚"
+    },
+    {
+      "id": "cat_parotta",
+      "name": "Parotta & Breads",
+      "description": "Flaky South Indian parottas, naans, and stuffed flatbreads",
+      "icon": "🫓"
+    },
+    {
+      "id": "cat_dosa",
+      "name": "Dosa & Tiffin",
+      "description": "Golden crispy dosas, fluffy idlis, and traditional tiffin items",
+      "icon": "🥞"
+    },
+    {
+      "id": "cat_gravies",
+      "name": "Gravies & Meals",
+      "description": "Rich Chettinad, Mughlai, and traditional South Indian gravies",
+      "icon": "🥘"
+    },
+    {
+      "id": "cat_beverages",
+      "name": "Beverages & Juices",
+      "description": "Fresh fruit juices, chilled lassis, and herbal coolers",
+      "icon": "🥤"
+    },
+    {
+      "id": "cat_desserts",
+      "name": "Desserts",
+      "description": "Sweet traditional treats and ice cream delights",
+      "icon": "🍨"
+    }
+  ],
+  "menuItems": [
+    {
+      "id": "item_101",
+      "name": "Hunter's Special Chicken Biriyani",
+      "description": "Slow-dum cooked tender chicken marinated in authentic secret house spices with Seeraga Samba rice",
+      "categoryId": "cat_biriyani",
+      "categoryName": "Biriyani Specials",
+      "price": 240,
+      "discountPrice": 220,
+      "imageUrl": "https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=600&auto=format&fit=crop&q=80",
+      "isVeg": false,
+      "isAvailable": true,
+      "prepTimeMinutes": 20,
+      "isBestseller": true,
+      "isPopular": true,
+      "rating": 4.9,
+      "ratingCount": 382,
+      "customizations": [
+        {
+          "id": "cust_spice_1",
+          "name": "Spice Level",
+          "options": [
+            {
+              "label": "Medium Spice",
+              "price": 0
+            },
+            {
+              "label": "Authentic Spicy",
+              "price": 0
+            },
+            {
+              "label": "Extra Spicy",
+              "price": 0
+            }
+          ]
+        }
+      ],
+      "addons": [
+        {
+          "id": "add_egg",
+          "name": "Boiled Egg (1 Pc)",
+          "price": 15
+        },
+        {
+          "id": "add_gravy",
+          "name": "Extra Salna / Gravy",
+          "price": 20
+        },
+        {
+          "id": "add_raitha",
+          "name": "Extra Onion Raitha",
+          "price": 15
+        }
+      ],
+      "ingredients": [
+        "Seeraga Samba Rice",
+        "Tender Chicken",
+        "Ghee",
+        "Biriyani Spices",
+        "Mint",
+        "Coriander"
+      ]
+    },
+    {
+      "id": "item_102",
+      "name": "Mutton Seeraga Samba Biriyani",
+      "description": "Rich and aromatic mutton biriyani cooked with tender grass-fed mutton pieces and ghee",
+      "categoryId": "cat_biriyani",
+      "categoryName": "Biriyani Specials",
+      "price": 340,
+      "discountPrice": 320,
+      "imageUrl": "https://images.unsplash.com/photo-1626777552726-4a6b54c97e46?w=600&auto=format&fit=crop&q=80",
+      "isVeg": false,
+      "isAvailable": true,
+      "prepTimeMinutes": 25,
+      "isBestseller": true,
+      "rating": 4.9,
+      "ratingCount": 295,
+      "customizations": [
+        {
+          "id": "cust_spice_2",
+          "name": "Spice Level",
+          "options": [
+            {
+              "label": "Medium Spice",
+              "price": 0
+            },
+            {
+              "label": "Spicy",
+              "price": 0
+            }
+          ]
+        }
+      ],
+      "addons": [
+        {
+          "id": "add_egg_2",
+          "name": "Boiled Egg",
+          "price": 15
+        },
+        {
+          "id": "add_bone_marrow",
+          "name": "Bone Marrow Extra",
+          "price": 60
+        }
+      ]
+    },
+    {
+      "id": "item_103",
+      "name": "Mushroom Dum Biriyani",
+      "description": "Fragrant basmati rice dum cooked with fresh button mushrooms, caramelized onions, and whole spices",
+      "categoryId": "cat_biriyani",
+      "categoryName": "Biriyani Specials",
+      "price": 190,
+      "imageUrl": "https://images.unsplash.com/photo-1642821373181-696a54913e93?w=600&auto=format&fit=crop&q=80",
+      "isVeg": true,
+      "isAvailable": true,
+      "prepTimeMinutes": 18,
+      "isPopular": true,
+      "rating": 4.7,
+      "ratingCount": 142
+    },
+    {
+      "id": "item_104",
+      "name": "Chicken 65 Boneless",
+      "description": "Crispy deep-fried chicken cubes tossed with curry leaves, green chillies, and homemade masala",
+      "categoryId": "cat_starters",
+      "categoryName": "Starters & Tandoori",
+      "price": 220,
+      "imageUrl": "https://images.unsplash.com/photo-1610057099443-fde8c4d50f91?w=600&auto=format&fit=crop&q=80",
+      "isVeg": false,
+      "isAvailable": true,
+      "prepTimeMinutes": 15,
+      "isBestseller": true,
+      "isPopular": true,
+      "rating": 4.8,
+      "ratingCount": 410
+    },
+    {
+      "id": "item_105",
+      "name": "Paneer Tikka Charcoal Grill",
+      "description": "Fresh malai paneer cubes marinated in yogurt and tandoori spices, charcoal roasted to perfection",
+      "categoryId": "cat_starters",
+      "categoryName": "Starters & Tandoori",
+      "price": 190,
+      "imageUrl": "https://images.unsplash.com/photo-1567188040759-fb8a883dc6d8?w=600&auto=format&fit=crop&q=80",
+      "isVeg": true,
+      "isAvailable": true,
+      "prepTimeMinutes": 15,
+      "rating": 4.6,
+      "ratingCount": 180
+    },
+    {
+      "id": "item_106",
+      "name": "Madurai Bun Parotta (2 Pcs)",
+      "description": "Soft and crispy bun parotta baked layer by layer using traditional ghee recipe",
+      "categoryId": "cat_parotta",
+      "categoryName": "Parotta & Breads",
+      "price": 70,
+      "imageUrl": "https://images.unsplash.com/photo-1626074353765-517a681e40be?w=600&auto=format&fit=crop&q=80",
+      "isVeg": true,
+      "isAvailable": true,
+      "prepTimeMinutes": 10,
+      "isBestseller": true,
+      "rating": 4.9,
+      "ratingCount": 520
+    },
+    {
+      "id": "item_107",
+      "name": "Ceylon Chicken Kothu Parotta",
+      "description": "Shredded parotta chopped on hot griddle with chicken, eggs, onions, and spicy gravy",
+      "categoryId": "cat_parotta",
+      "categoryName": "Parotta & Breads",
+      "price": 160,
+      "imageUrl": "https://images.unsplash.com/photo-1601050690597-df0568f70950?w=600&auto=format&fit=crop&q=80",
+      "isVeg": false,
+      "isAvailable": true,
+      "prepTimeMinutes": 15,
+      "isPopular": true,
+      "rating": 4.8,
+      "ratingCount": 310
+    },
+    {
+      "id": "item_108",
+      "name": "Ghee Roast Butter Dosa",
+      "description": "Golden crispy thin dosa roasted generously with pure Cow Ghee, served with 3 chutneys & sambar",
+      "categoryId": "cat_dosa",
+      "categoryName": "Dosa & Tiffin",
+      "price": 100,
+      "imageUrl": "https://images.unsplash.com/photo-1668236543090-82eba5ee5976?w=600&auto=format&fit=crop&q=80",
+      "isVeg": true,
+      "isAvailable": true,
+      "prepTimeMinutes": 12,
+      "isPopular": true,
+      "rating": 4.7,
+      "ratingCount": 220
+    },
+    {
+      "id": "item_109",
+      "name": "Chettinad Chicken Pepper Gravy",
+      "description": "Traditional Chettinad style thick chicken curry infused with fresh roasted black pepper and coconut",
+      "categoryId": "cat_gravies",
+      "categoryName": "Gravies & Meals",
+      "price": 260,
+      "imageUrl": "https://images.unsplash.com/photo-1588166524941-3bf61a9c41db?w=600&auto=format&fit=crop&q=80",
+      "isVeg": false,
+      "isAvailable": true,
+      "prepTimeMinutes": 18,
+      "rating": 4.8,
+      "ratingCount": 260
+    },
+    {
+      "id": "item_110",
+      "name": "Elaneer Payasam (Tender Coconut)",
+      "description": "Signature chilled dessert made with fresh tender coconut water, coconut pulp, milk, and cardamom",
+      "categoryId": "cat_desserts",
+      "categoryName": "Desserts",
+      "price": 120,
+      "imageUrl": "https://images.unsplash.com/photo-1551024709-8f23befc6f87?w=600&auto=format&fit=crop&q=80",
+      "isVeg": true,
+      "isAvailable": true,
+      "prepTimeMinutes": 5,
+      "isBestseller": true,
+      "rating": 4.9,
+      "ratingCount": 340
+    },
+    {
+      "id": "item_111",
+      "name": "Fresh Mint Lime Soda",
+      "description": "Refreshing sparkling cooler with handpicked mint leaves, fresh lime juice, and rock salt",
+      "categoryId": "cat_beverages",
+      "categoryName": "Beverages & Juices",
+      "price": 60,
+      "imageUrl": "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?w=600&auto=format&fit=crop&q=80",
+      "isVeg": true,
+      "isAvailable": true,
+      "prepTimeMinutes": 5,
+      "rating": 4.6,
+      "ratingCount": 150
+    }
+  ],
+  "orders": [
+    {
+      "id": "ord_1789553796921",
+      "orderNumber": "HK-20260916-000114",
+      "customerId": "cust_test_1",
+      "customerName": "Test Customer",
+      "customerPhone": "+91 99999 11111",
+      "deliveryAddress": {
+        "id": "addr_1",
+        "type": "HOME",
+        "name": "Test Customer",
+        "phone": "+91 99999 11111",
+        "doorNo": "12",
+        "street": "Race Course Road",
+        "area": "Race Course",
+        "city": "Coimbatore",
+        "pincode": "641018",
+        "coordinates": "11.0168,76.9558",
+        "isDefault": true
+      },
+      "items": [
+        {
+          "menuItemId": "1",
+          "name": "Seeraga Samba Mutton Biriyani",
+          "quantity": 1,
+          "unitPrice": 380,
+          "totalPrice": 380,
+          "isVeg": false,
+          "customizations": [],
+          "addons": []
+        }
+      ],
+      "itemCount": 1,
+      "subtotal": 380,
+      "deliveryFee": 35,
+      "tax": 19,
+      "discount": 0,
+      "grandTotal": 434,
+      "paymentMethod": "COD",
+      "paymentStatus": "COD_PENDING",
+      "status": "ASSIGNED",
+      "codCashTendered": 500,
+      "codChangeDue": 66,
+      "version": 5,
+      "createdAt": "2026-09-16T10:16:36.921Z",
+      "updatedAt": "2026-09-16T10:16:36.938Z",
+      "events": [
+        {
+          "id": "evt_1789553796921",
+          "orderId": "ord_1789553796921",
+          "status": "PLACED",
+          "title": "Order Placed",
+          "description": "Order placed with Cash on Delivery",
+          "timestamp": "2026-09-16T10:16:36.921Z",
+          "changedBy": "cust_test_1",
+          "changedByRole": "CUSTOMER"
+        },
+        {
+          "id": "evt_1789553796925",
+          "orderId": "ord_1789553796921",
+          "status": "ACCEPTED",
+          "title": "Order Accepted",
+          "description": "Accepted by Chef Raj (STAFF)",
+          "timestamp": "2026-09-16T10:16:36.925Z",
+          "changedBy": "staff_1",
+          "changedByRole": "STAFF"
+        },
+        {
+          "id": "evt_1789553796929",
+          "orderId": "ord_1789553796921",
+          "status": "PREPARING",
+          "title": "Food Preparing",
+          "description": "Kitchen is actively preparing your dishes",
+          "timestamp": "2026-09-16T10:16:36.929Z",
+          "changedBy": "staff_1",
+          "changedByRole": "STAFF"
+        },
+        {
+          "id": "evt_1789553796933",
+          "orderId": "ord_1789553796921",
+          "status": "READY",
+          "title": "Food Ready",
+          "description": "Packaging completed & awaiting delivery assignment",
+          "timestamp": "2026-09-16T10:16:36.933Z",
+          "changedBy": "staff_1",
+          "changedByRole": "STAFF"
+        },
+        {
+          "id": "evt_1789553796939",
+          "orderId": "ord_1789553796921",
+          "status": "ASSIGNED",
+          "title": "Delivery Partner Assigned",
+          "description": "Assigned to Arun Kumar",
+          "timestamp": "2026-09-16T10:16:36.938Z",
+          "changedBy": "staff_1",
+          "changedByRole": "STAFF"
+        }
+      ],
+      "acceptedAt": "2026-09-16T10:16:36.925Z",
+      "preparingAt": "2026-09-16T10:16:36.929Z",
+      "readyAt": "2026-09-16T10:16:36.933Z",
+      "assignedDeliveryPartnerId": "usr_delivery_1",
+      "assignedDeliveryPartnerName": "Arun Kumar",
+      "assignedDeliveryPartnerPhone": "+91 91234 56789",
+      "assignedDeliveryPartnerVehicle": "TN-37-AB-1234"
+    },
+    {
+      "id": "ord_1789550822484",
+      "orderNumber": "HK-20260916-000113",
+      "customerId": "cust_test_1",
+      "customerName": "Test Customer",
+      "customerPhone": "+91 99999 11111",
+      "deliveryAddress": {
+        "id": "addr_1",
+        "type": "HOME",
+        "name": "Test Customer",
+        "phone": "+91 99999 11111",
+        "doorNo": "12",
+        "street": "Race Course Road",
+        "area": "Race Course",
+        "city": "Coimbatore",
+        "pincode": "641018",
+        "coordinates": "11.0168,76.9558",
+        "isDefault": true
+      },
+      "items": [
+        {
+          "menuItemId": "1",
+          "name": "Seeraga Samba Mutton Biriyani",
+          "quantity": 1,
+          "unitPrice": 380,
+          "totalPrice": 380,
+          "isVeg": false,
+          "customizations": [],
+          "addons": []
+        }
+      ],
+      "itemCount": 1,
+      "subtotal": 380,
+      "deliveryFee": 35,
+      "tax": 19,
+      "discount": 0,
+      "grandTotal": 434,
+      "paymentMethod": "COD",
+      "paymentStatus": "COD_PENDING",
+      "status": "ASSIGNED",
+      "codCashTendered": 500,
+      "codChangeDue": 66,
+      "version": 5,
+      "createdAt": "2026-09-16T09:27:02.484Z",
+      "updatedAt": "2026-09-16T09:27:02.504Z",
+      "events": [
+        {
+          "id": "evt_1789550822484",
+          "orderId": "ord_1789550822484",
+          "status": "PLACED",
+          "title": "Order Placed",
+          "description": "Order placed with Cash on Delivery",
+          "timestamp": "2026-09-16T09:27:02.484Z",
+          "changedBy": "cust_test_1",
+          "changedByRole": "CUSTOMER"
+        },
+        {
+          "id": "evt_1789550822488",
+          "orderId": "ord_1789550822484",
+          "status": "ACCEPTED",
+          "title": "Order Accepted",
+          "description": "Accepted by Chef Raj (STAFF)",
+          "timestamp": "2026-09-16T09:27:02.488Z",
+          "changedBy": "staff_1",
+          "changedByRole": "STAFF"
+        },
+        {
+          "id": "evt_1789550822494",
+          "orderId": "ord_1789550822484",
+          "status": "PREPARING",
+          "title": "Food Preparing",
+          "description": "Kitchen is actively preparing your dishes",
+          "timestamp": "2026-09-16T09:27:02.494Z",
+          "changedBy": "staff_1",
+          "changedByRole": "STAFF"
+        },
+        {
+          "id": "evt_1789550822498",
+          "orderId": "ord_1789550822484",
+          "status": "READY",
+          "title": "Food Ready",
+          "description": "Packaging completed & awaiting delivery assignment",
+          "timestamp": "2026-09-16T09:27:02.498Z",
+          "changedBy": "staff_1",
+          "changedByRole": "STAFF"
+        },
+        {
+          "id": "evt_1789550822506",
+          "orderId": "ord_1789550822484",
+          "status": "ASSIGNED",
+          "title": "Delivery Partner Assigned",
+          "description": "Assigned to Arun Kumar",
+          "timestamp": "2026-09-16T09:27:02.504Z",
+          "changedBy": "staff_1",
+          "changedByRole": "STAFF"
+        }
+      ],
+      "acceptedAt": "2026-09-16T09:27:02.488Z",
+      "preparingAt": "2026-09-16T09:27:02.494Z",
+      "readyAt": "2026-09-16T09:27:02.498Z",
+      "assignedDeliveryPartnerId": "usr_delivery_1",
+      "assignedDeliveryPartnerName": "Arun Kumar",
+      "assignedDeliveryPartnerPhone": "+91 91234 56789",
+      "assignedDeliveryPartnerVehicle": "TN-37-AB-1234"
+    },
+    {
+      "id": "ord_1789316343046",
+      "orderNumber": "HK-20260913-000112",
+      "customerId": "cust_test_1",
+      "customerName": "Test Customer",
+      "customerPhone": "+91 99999 11111",
+      "deliveryAddress": {
+        "id": "addr_1",
+        "type": "HOME",
+        "name": "Test Customer",
+        "phone": "+91 99999 11111",
+        "doorNo": "12",
+        "street": "Race Course Road",
+        "area": "Race Course",
+        "city": "Coimbatore",
+        "pincode": "641018",
+        "coordinates": "11.0168,76.9558",
+        "isDefault": true
+      },
+      "items": [
+        {
+          "menuItemId": "1",
+          "name": "Seeraga Samba Mutton Biriyani",
+          "quantity": 1,
+          "unitPrice": 380,
+          "totalPrice": 380,
+          "isVeg": false,
+          "customizations": [],
+          "addons": []
+        }
+      ],
+      "itemCount": 1,
+      "subtotal": 380,
+      "deliveryFee": 35,
+      "tax": 19,
+      "discount": 0,
+      "grandTotal": 434,
+      "paymentMethod": "COD",
+      "paymentStatus": "COD_PENDING",
+      "status": "ASSIGNED",
+      "codCashTendered": 500,
+      "codChangeDue": 66,
+      "version": 5,
+      "createdAt": "2026-09-13T16:19:03.046Z",
+      "updatedAt": "2026-09-13T16:19:03.089Z",
+      "events": [
+        {
+          "id": "evt_1789316343046",
+          "orderId": "ord_1789316343046",
+          "status": "PLACED",
+          "title": "Order Placed",
+          "description": "Order placed with Cash on Delivery",
+          "timestamp": "2026-09-13T16:19:03.046Z",
+          "changedBy": "cust_test_1",
+          "changedByRole": "CUSTOMER"
+        },
+        {
+          "id": "evt_1789316343049",
+          "orderId": "ord_1789316343046",
+          "status": "ACCEPTED",
+          "title": "Order Accepted",
+          "description": "Accepted by Chef Raj (STAFF)",
+          "timestamp": "2026-09-13T16:19:03.049Z",
+          "changedBy": "staff_1",
+          "changedByRole": "STAFF"
+        },
+        {
+          "id": "evt_1789316343053",
+          "orderId": "ord_1789316343046",
+          "status": "PREPARING",
+          "title": "Food Preparing",
+          "description": "Kitchen is actively preparing your dishes",
+          "timestamp": "2026-09-13T16:19:03.053Z",
+          "changedBy": "staff_1",
+          "changedByRole": "STAFF"
+        },
+        {
+          "id": "evt_1789316343056",
+          "orderId": "ord_1789316343046",
+          "status": "READY",
+          "title": "Food Ready",
+          "description": "Packaging completed & awaiting delivery assignment",
+          "timestamp": "2026-09-13T16:19:03.056Z",
+          "changedBy": "staff_1",
+          "changedByRole": "STAFF"
+        },
+        {
+          "id": "evt_1789316343090",
+          "orderId": "ord_1789316343046",
+          "status": "ASSIGNED",
+          "title": "Delivery Partner Assigned",
+          "description": "Assigned to Delivery Agent",
+          "timestamp": "2026-09-13T16:19:03.089Z",
+          "changedBy": "staff_1",
+          "changedByRole": "STAFF"
+        }
+      ],
+      "acceptedAt": "2026-09-13T16:19:03.049Z",
+      "preparingAt": "2026-09-13T16:19:03.053Z",
+      "readyAt": "2026-09-13T16:19:03.056Z",
+      "assignedDeliveryPartnerId": "usr_delivery_1",
+      "assignedDeliveryPartnerName": "Arun Kumar",
+      "assignedDeliveryPartnerPhone": "+91 91234 56789",
+      "assignedDeliveryPartnerVehicle": "TN-37-AB-1234"
+    },
+    {
+      "id": "ord_1789316076929",
+      "orderNumber": "HK-20260913-000111",
+      "customerId": "cust_test_1",
+      "customerName": "Test Customer",
+      "customerPhone": "+91 99999 11111",
+      "deliveryAddress": {
+        "id": "addr_1",
+        "type": "HOME",
+        "name": "Test Customer",
+        "phone": "+91 99999 11111",
+        "doorNo": "12",
+        "street": "Race Course Road",
+        "area": "Race Course",
+        "city": "Coimbatore",
+        "pincode": "641018",
+        "coordinates": "11.0168,76.9558",
+        "isDefault": true
+      },
+      "items": [
+        {
+          "menuItemId": "1",
+          "name": "Seeraga Samba Mutton Biriyani",
+          "quantity": 1,
+          "unitPrice": 380,
+          "totalPrice": 380,
+          "isVeg": false,
+          "customizations": [],
+          "addons": []
+        }
+      ],
+      "itemCount": 1,
+      "subtotal": 380,
+      "deliveryFee": 35,
+      "tax": 19,
+      "discount": 0,
+      "grandTotal": 434,
+      "paymentMethod": "COD",
+      "paymentStatus": "COD_PENDING",
+      "status": "ASSIGNED",
+      "codCashTendered": 500,
+      "codChangeDue": 66,
+      "version": 5,
+      "createdAt": "2026-09-13T16:14:36.929Z",
+      "updatedAt": "2026-09-13T16:14:36.943Z",
+      "events": [
+        {
+          "id": "evt_1789316076929",
+          "orderId": "ord_1789316076929",
+          "status": "PLACED",
+          "title": "Order Placed",
+          "description": "Order placed with Cash on Delivery",
+          "timestamp": "2026-09-13T16:14:36.929Z",
+          "changedBy": "cust_test_1",
+          "changedByRole": "CUSTOMER"
+        },
+        {
+          "id": "evt_1789316076932",
+          "orderId": "ord_1789316076929",
+          "status": "ACCEPTED",
+          "title": "Order Accepted",
+          "description": "Accepted by Chef Raj (STAFF)",
+          "timestamp": "2026-09-13T16:14:36.932Z",
+          "changedBy": "staff_1",
+          "changedByRole": "STAFF"
+        },
+        {
+          "id": "evt_1789316076937",
+          "orderId": "ord_1789316076929",
+          "status": "PREPARING",
+          "title": "Food Preparing",
+          "description": "Kitchen is actively preparing your dishes",
+          "timestamp": "2026-09-13T16:14:36.937Z",
+          "changedBy": "staff_1",
+          "changedByRole": "STAFF"
+        },
+        {
+          "id": "evt_1789316076940",
+          "orderId": "ord_1789316076929",
+          "status": "READY",
+          "title": "Food Ready",
+          "description": "Packaging completed & awaiting delivery assignment",
+          "timestamp": "2026-09-13T16:14:36.940Z",
+          "changedBy": "staff_1",
+          "changedByRole": "STAFF"
+        },
+        {
+          "id": "evt_1789316076943",
+          "orderId": "ord_1789316076929",
+          "status": "ASSIGNED",
+          "title": "Delivery Partner Assigned",
+          "description": "Assigned to Delivery Agent",
+          "timestamp": "2026-09-13T16:14:36.943Z",
+          "changedBy": "staff_1",
+          "changedByRole": "STAFF"
+        }
+      ],
+      "acceptedAt": "2026-09-13T16:14:36.932Z",
+      "preparingAt": "2026-09-13T16:14:36.937Z",
+      "readyAt": "2026-09-13T16:14:36.940Z",
+      "assignedDeliveryPartnerId": "usr_delivery_1",
+      "assignedDeliveryPartnerName": "Arun Kumar",
+      "assignedDeliveryPartnerPhone": "+91 91234 56789",
+      "assignedDeliveryPartnerVehicle": "TN-37-AB-1234"
+    },
+    {
+      "id": "ord_1789314830835",
+      "orderNumber": "HK-20260913-000110",
+      "customerId": "cust_test_1",
+      "customerName": "Test Customer",
+      "customerPhone": "+91 99999 11111",
+      "deliveryAddress": {
+        "id": "addr_1",
+        "type": "HOME",
+        "name": "Test Customer",
+        "phone": "+91 99999 11111",
+        "doorNo": "12",
+        "street": "Race Course Road",
+        "area": "Race Course",
+        "city": "Coimbatore",
+        "pincode": "641018",
+        "coordinates": "11.0168,76.9558",
+        "isDefault": true
+      },
+      "items": [
+        {
+          "menuItemId": "1",
+          "name": "Seeraga Samba Mutton Biriyani",
+          "quantity": 1,
+          "unitPrice": 380,
+          "totalPrice": 380,
+          "isVeg": false,
+          "customizations": [],
+          "addons": []
+        }
+      ],
+      "itemCount": 1,
+      "subtotal": 380,
+      "deliveryFee": 35,
+      "tax": 19,
+      "discount": 0,
+      "grandTotal": 434,
+      "paymentMethod": "COD",
+      "paymentStatus": "COD_PENDING",
+      "status": "ASSIGNED",
+      "codCashTendered": 500,
+      "codChangeDue": 66,
+      "version": 5,
+      "createdAt": "2026-09-13T15:53:50.835Z",
+      "updatedAt": "2026-09-13T15:53:50.848Z",
+      "events": [
+        {
+          "id": "evt_1789314830835",
+          "orderId": "ord_1789314830835",
+          "status": "PLACED",
+          "title": "Order Placed",
+          "description": "Order placed with Cash on Delivery",
+          "timestamp": "2026-09-13T15:53:50.835Z",
+          "changedBy": "cust_test_1",
+          "changedByRole": "CUSTOMER"
+        },
+        {
+          "id": "evt_1789314830840",
+          "orderId": "ord_1789314830835",
+          "status": "ACCEPTED",
+          "title": "Order Accepted",
+          "description": "Accepted by Chef Raj (STAFF)",
+          "timestamp": "2026-09-13T15:53:50.840Z",
+          "changedBy": "staff_1",
+          "changedByRole": "STAFF"
+        },
+        {
+          "id": "evt_1789314830843",
+          "orderId": "ord_1789314830835",
+          "status": "PREPARING",
+          "title": "Food Preparing",
+          "description": "Kitchen is actively preparing your dishes",
+          "timestamp": "2026-09-13T15:53:50.843Z",
+          "changedBy": "staff_1",
+          "changedByRole": "STAFF"
+        },
+        {
+          "id": "evt_1789314830845",
+          "orderId": "ord_1789314830835",
+          "status": "READY",
+          "title": "Food Ready",
+          "description": "Packaging completed & awaiting delivery assignment",
+          "timestamp": "2026-09-13T15:53:50.845Z",
+          "changedBy": "staff_1",
+          "changedByRole": "STAFF"
+        },
+        {
+          "id": "evt_1789314830848",
+          "orderId": "ord_1789314830835",
+          "status": "ASSIGNED",
+          "title": "Delivery Partner Assigned",
+          "description": "Assigned to Delivery Agent",
+          "timestamp": "2026-09-13T15:53:50.848Z",
+          "changedBy": "staff_1",
+          "changedByRole": "STAFF"
+        }
+      ],
+      "acceptedAt": "2026-09-13T15:53:50.840Z",
+      "preparingAt": "2026-09-13T15:53:50.843Z",
+      "readyAt": "2026-09-13T15:53:50.845Z",
+      "assignedDeliveryPartnerId": "usr_delivery_1",
+      "assignedDeliveryPartnerName": "Arun Kumar",
+      "assignedDeliveryPartnerPhone": "+91 91234 56789",
+      "assignedDeliveryPartnerVehicle": "TN-37-AB-1234"
+    },
+    {
+      "id": "ord_1789314588725",
+      "orderNumber": "HK-20260913-000109",
+      "customerId": "cust_test_1",
+      "customerName": "Test Customer",
+      "customerPhone": "+91 99999 11111",
+      "deliveryAddress": {
+        "id": "addr_1",
+        "type": "HOME",
+        "name": "Test Customer",
+        "phone": "+91 99999 11111",
+        "doorNo": "12",
+        "street": "Race Course Road",
+        "area": "Race Course",
+        "city": "Coimbatore",
+        "pincode": "641018",
+        "coordinates": "11.0168,76.9558",
+        "isDefault": true
+      },
+      "items": [
+        {
+          "menuItemId": "1",
+          "name": "Seeraga Samba Mutton Biriyani",
+          "quantity": 1,
+          "unitPrice": 380,
+          "totalPrice": 380,
+          "isVeg": false,
+          "customizations": [],
+          "addons": []
+        }
+      ],
+      "itemCount": 1,
+      "subtotal": 380,
+      "deliveryFee": 35,
+      "tax": 19,
+      "discount": 0,
+      "grandTotal": 434,
+      "paymentMethod": "COD",
+      "paymentStatus": "COD_PENDING",
+      "status": "ASSIGNED",
+      "codCashTendered": 500,
+      "codChangeDue": 66,
+      "version": 5,
+      "createdAt": "2026-09-13T15:49:48.725Z",
+      "updatedAt": "2026-09-13T15:49:48.737Z",
+      "events": [
+        {
+          "id": "evt_1789314588725",
+          "orderId": "ord_1789314588725",
+          "status": "PLACED",
+          "title": "Order Placed",
+          "description": "Order placed with Cash on Delivery",
+          "timestamp": "2026-09-13T15:49:48.725Z",
+          "changedBy": "cust_test_1",
+          "changedByRole": "CUSTOMER"
+        },
+        {
+          "id": "evt_1789314588729",
+          "orderId": "ord_1789314588725",
+          "status": "ACCEPTED",
+          "title": "Order Accepted",
+          "description": "Accepted by Chef Raj (STAFF)",
+          "timestamp": "2026-09-13T15:49:48.729Z",
+          "changedBy": "staff_1",
+          "changedByRole": "STAFF"
+        },
+        {
+          "id": "evt_1789314588732",
+          "orderId": "ord_1789314588725",
+          "status": "PREPARING",
+          "title": "Food Preparing",
+          "description": "Kitchen is actively preparing your dishes",
+          "timestamp": "2026-09-13T15:49:48.732Z",
+          "changedBy": "staff_1",
+          "changedByRole": "STAFF"
+        },
+        {
+          "id": "evt_1789314588735",
+          "orderId": "ord_1789314588725",
+          "status": "READY",
+          "title": "Food Ready",
+          "description": "Packaging completed & awaiting delivery assignment",
+          "timestamp": "2026-09-13T15:49:48.735Z",
+          "changedBy": "staff_1",
+          "changedByRole": "STAFF"
+        },
+        {
+          "id": "evt_1789314588737",
+          "orderId": "ord_1789314588725",
+          "status": "ASSIGNED",
+          "title": "Delivery Partner Assigned",
+          "description": "Assigned to Delivery Agent",
+          "timestamp": "2026-09-13T15:49:48.737Z",
+          "changedBy": "staff_1",
+          "changedByRole": "STAFF"
+        }
+      ],
+      "acceptedAt": "2026-09-13T15:49:48.729Z",
+      "preparingAt": "2026-09-13T15:49:48.732Z",
+      "readyAt": "2026-09-13T15:49:48.735Z",
+      "assignedDeliveryPartnerId": "usr_delivery_1",
+      "assignedDeliveryPartnerName": "Arun Kumar",
+      "assignedDeliveryPartnerPhone": "+91 91234 56789",
+      "assignedDeliveryPartnerVehicle": "TN-37-AB-1234"
+    },
+    {
+      "id": "ord_1789314522319",
+      "orderNumber": "HK-20260913-000108",
+      "customerId": "cust_test_1",
+      "customerName": "Test Customer",
+      "customerPhone": "+91 99999 11111",
+      "deliveryAddress": {
+        "id": "addr_1",
+        "label": "Home",
+        "addressLine": "12 Race Course Road",
+        "city": "Coimbatore",
+        "pincode": "641018",
+        "coordinates": {
+          "lat": 11.0168,
+          "lng": 76.9558
+        },
+        "isDefault": true
+      },
+      "items": [
+        {
+          "menuItemId": "1",
+          "name": "Seeraga Samba Mutton Biriyani",
+          "quantity": 1,
+          "unitPrice": 380,
+          "totalPrice": 380,
+          "customizations": []
+        }
+      ],
+      "itemCount": 1,
+      "subtotal": 380,
+      "deliveryFee": 35,
+      "tax": 19,
+      "discount": 0,
+      "grandTotal": 434,
+      "paymentMethod": "COD",
+      "paymentStatus": "COD_PENDING",
+      "status": "ASSIGNED",
+      "codCashTendered": 500,
+      "codChangeDue": 66,
+      "version": 5,
+      "createdAt": "2026-09-13T15:48:42.319Z",
+      "updatedAt": "2026-09-13T15:48:42.335Z",
+      "events": [
+        {
+          "id": "evt_1789314522319",
+          "orderId": "ord_1789314522319",
+          "status": "PLACED",
+          "title": "Order Placed",
+          "description": "Order placed with Cash on Delivery",
+          "timestamp": "2026-09-13T15:48:42.319Z",
+          "changedBy": "cust_test_1",
+          "changedByRole": "CUSTOMER"
+        },
+        {
+          "id": "evt_1789314522323",
+          "orderId": "ord_1789314522319",
+          "status": "ACCEPTED",
+          "title": "Order Accepted",
+          "description": "Accepted by Chef Raj (KITCHEN_STAFF)",
+          "timestamp": "2026-09-13T15:48:42.323Z",
+          "changedBy": "staff_1",
+          "changedByRole": "KITCHEN_STAFF"
+        },
+        {
+          "id": "evt_1789314522327",
+          "orderId": "ord_1789314522319",
+          "status": "PREPARING",
+          "title": "Food Preparing",
+          "description": "Kitchen is actively preparing your dishes",
+          "timestamp": "2026-09-13T15:48:42.327Z",
+          "changedBy": "staff_1",
+          "changedByRole": "KITCHEN_STAFF"
+        },
+        {
+          "id": "evt_1789314522331",
+          "orderId": "ord_1789314522319",
+          "status": "READY",
+          "title": "Food Ready",
+          "description": "Packaging completed & awaiting delivery assignment",
+          "timestamp": "2026-09-13T15:48:42.331Z",
+          "changedBy": "staff_1",
+          "changedByRole": "KITCHEN_STAFF"
+        },
+        {
+          "id": "evt_1789314522335",
+          "orderId": "ord_1789314522319",
+          "status": "ASSIGNED",
+          "title": "Delivery Partner Assigned",
+          "description": "Assigned to Delivery Agent",
+          "timestamp": "2026-09-13T15:48:42.335Z",
+          "changedBy": "staff_1",
+          "changedByRole": "KITCHEN_STAFF"
+        }
+      ],
+      "acceptedAt": "2026-09-13T15:48:42.323Z",
+      "preparingAt": "2026-09-13T15:48:42.327Z",
+      "readyAt": "2026-09-13T15:48:42.331Z",
+      "assignedDeliveryPartnerId": "usr_delivery_1",
+      "assignedDeliveryPartnerName": "Arun Kumar",
+      "assignedDeliveryPartnerPhone": "+91 91234 56789",
+      "assignedDeliveryPartnerVehicle": "TN-37-AB-1234"
+    },
+    {
+      "id": "ord_1789314486847",
+      "orderNumber": "HK-20260913-000107",
+      "customerId": "cust_test_1",
+      "customerName": "Test Customer",
+      "customerPhone": "+91 99999 11111",
+      "deliveryAddress": {
+        "id": "addr_1",
+        "label": "Home",
+        "addressLine": "12 Race Course Road",
+        "city": "Coimbatore",
+        "pincode": "641018",
+        "coordinates": {
+          "lat": 11.0168,
+          "lng": 76.9558
+        },
+        "isDefault": true
+      },
+      "items": [
+        {
+          "menuItemId": "1",
+          "name": "Seeraga Samba Mutton Biriyani",
+          "quantity": 1,
+          "unitPrice": 380,
+          "totalPrice": 380,
+          "customizations": []
+        }
+      ],
+      "itemCount": 1,
+      "subtotal": 380,
+      "deliveryFee": 35,
+      "tax": 19,
+      "discount": 0,
+      "grandTotal": 434,
+      "paymentMethod": "COD",
+      "paymentStatus": "COD_PENDING",
+      "status": "ASSIGNED",
+      "codCashTendered": 500,
+      "codChangeDue": 66,
+      "version": 5,
+      "createdAt": "2026-09-13T15:48:06.847Z",
+      "updatedAt": "2026-09-13T15:48:06.857Z",
+      "events": [
+        {
+          "id": "evt_1789314486847",
+          "orderId": "ord_1789314486847",
+          "status": "PLACED",
+          "title": "Order Placed",
+          "description": "Order placed with Cash on Delivery",
+          "timestamp": "2026-09-13T15:48:06.847Z",
+          "changedBy": "cust_test_1",
+          "changedByRole": "CUSTOMER"
+        },
+        {
+          "id": "evt_1789314486850",
+          "orderId": "ord_1789314486847",
+          "status": "ACCEPTED",
+          "title": "Order Accepted",
+          "description": "Accepted by Chef Raj (KITCHEN_STAFF)",
+          "timestamp": "2026-09-13T15:48:06.850Z",
+          "changedBy": "staff_1",
+          "changedByRole": "KITCHEN_STAFF"
+        },
+        {
+          "id": "evt_1789314486852",
+          "orderId": "ord_1789314486847",
+          "status": "PREPARING",
+          "title": "Food Preparing",
+          "description": "Kitchen is actively preparing your dishes",
+          "timestamp": "2026-09-13T15:48:06.852Z",
+          "changedBy": "staff_1",
+          "changedByRole": "KITCHEN_STAFF"
+        },
+        {
+          "id": "evt_1789314486855",
+          "orderId": "ord_1789314486847",
+          "status": "READY",
+          "title": "Food Ready",
+          "description": "Packaging completed & awaiting delivery assignment",
+          "timestamp": "2026-09-13T15:48:06.855Z",
+          "changedBy": "staff_1",
+          "changedByRole": "KITCHEN_STAFF"
+        },
+        {
+          "id": "evt_1789314486857",
+          "orderId": "ord_1789314486847",
+          "status": "ASSIGNED",
+          "title": "Delivery Partner Assigned",
+          "description": "Assigned to Delivery Agent",
+          "timestamp": "2026-09-13T15:48:06.857Z",
+          "changedBy": "staff_1",
+          "changedByRole": "KITCHEN_STAFF"
+        }
+      ],
+      "acceptedAt": "2026-09-13T15:48:06.850Z",
+      "preparingAt": "2026-09-13T15:48:06.852Z",
+      "readyAt": "2026-09-13T15:48:06.855Z",
+      "assignedDeliveryPartnerId": "usr_delivery_1",
+      "assignedDeliveryPartnerName": "Arun Kumar",
+      "assignedDeliveryPartnerPhone": "+91 91234 56789",
+      "assignedDeliveryPartnerVehicle": "TN-37-AB-1234"
+    },
+    {
+      "id": "ord_1789314442911",
+      "orderNumber": "HK-20260913-000106",
+      "customerId": "cust_test_1",
+      "customerName": "Test Customer",
+      "customerPhone": "+91 99999 11111",
+      "deliveryAddress": {
+        "id": "addr_1",
+        "label": "Home",
+        "addressLine": "12 Race Course Road",
+        "city": "Coimbatore",
+        "pincode": "641018",
+        "coordinates": {
+          "lat": 11.0168,
+          "lng": 76.9558
+        },
+        "isDefault": true
+      },
+      "items": [
+        {
+          "menuItemId": "1",
+          "name": "Seeraga Samba Mutton Biriyani",
+          "quantity": 1,
+          "unitPrice": 380,
+          "totalPrice": 380,
+          "customizations": []
+        }
+      ],
+      "itemCount": 1,
+      "subtotal": 380,
+      "deliveryFee": 35,
+      "tax": 19,
+      "discount": 0,
+      "grandTotal": 434,
+      "paymentMethod": "COD",
+      "paymentStatus": "COD_PENDING",
+      "status": "ACCEPTED",
+      "codCashTendered": 500,
+      "codChangeDue": 66,
+      "version": 2,
+      "createdAt": "2026-09-13T15:47:22.911Z",
+      "updatedAt": "2026-09-16T13:13:45.404Z",
+      "events": [
+        {
+          "id": "evt_1789314442911",
+          "orderId": "ord_1789314442911",
+          "status": "PLACED",
+          "title": "Order Placed",
+          "description": "Order placed with Cash on Delivery",
+          "timestamp": "2026-09-13T15:47:22.911Z",
+          "changedBy": "cust_test_1",
+          "changedByRole": "CUSTOMER"
+        },
+        {
+          "id": "evt_1789564425404",
+          "orderId": "ord_1789314442911",
+          "status": "ACCEPTED",
+          "title": "Order Accepted",
+          "description": "Accepted by Manoj Kumar (STAFF)",
+          "timestamp": "2026-09-16T13:13:45.404Z",
+          "changedBy": "usr_staff_1",
+          "changedByRole": "STAFF"
+        }
+      ],
+      "acceptedAt": "2026-09-16T13:13:45.404Z"
+    },
+    {
+      "id": "ord_1789314344720",
+      "orderNumber": "HK-20260913-000105",
+      "customerId": "cust_test_1",
+      "customerName": "Test Customer",
+      "customerPhone": "+91 99999 11111",
+      "deliveryAddress": {
+        "id": "addr_1",
+        "label": "Home",
+        "addressLine": "12 Race Course Road",
+        "city": "Coimbatore",
+        "pincode": "641018",
+        "coordinates": {
+          "lat": 11.0168,
+          "lng": 76.9558
+        },
+        "isDefault": true
+      },
+      "items": [
+        {
+          "menuItemId": "1",
+          "name": "Seeraga Samba Mutton Biriyani",
+          "quantity": 1,
+          "unitPrice": 380,
+          "totalPrice": 380,
+          "customizations": []
+        }
+      ],
+      "itemCount": 1,
+      "subtotal": 380,
+      "deliveryFee": 35,
+      "tax": 19,
+      "discount": 0,
+      "grandTotal": 434,
+      "paymentMethod": "COD",
+      "paymentStatus": "COD_PENDING",
+      "status": "ACCEPTED",
+      "codCashTendered": 500,
+      "codChangeDue": 66,
+      "version": 2,
+      "createdAt": "2026-09-13T15:45:44.720Z",
+      "updatedAt": "2026-09-16T13:13:45.596Z",
+      "events": [
+        {
+          "id": "evt_1789314344720",
+          "orderId": "ord_1789314344720",
+          "status": "PLACED",
+          "title": "Order Placed",
+          "description": "Order placed with Cash on Delivery",
+          "timestamp": "2026-09-13T15:45:44.720Z",
+          "changedBy": "cust_test_1",
+          "changedByRole": "CUSTOMER"
+        },
+        {
+          "id": "evt_1789564425596",
+          "orderId": "ord_1789314344720",
+          "status": "ACCEPTED",
+          "title": "Order Accepted",
+          "description": "Accepted by Manoj Kumar (STAFF)",
+          "timestamp": "2026-09-16T13:13:45.596Z",
+          "changedBy": "usr_staff_1",
+          "changedByRole": "STAFF"
+        }
+      ],
+      "acceptedAt": "2026-09-16T13:13:45.596Z"
+    },
+    {
+      "customerId": "usr_customer_1",
+      "customerName": "Priya Sundaram",
+      "customerPhone": "+91 99887 76655",
+      "deliveryAddress": {
+        "id": "addr_1",
+        "type": "HOME",
+        "name": "Priya Sundaram",
+        "phone": "+91 99887 76655",
+        "doorNo": "42-B",
+        "street": "Greenways Road, Sector 3",
+        "area": "Race Course",
+        "city": "Coimbatore",
+        "pincode": "641018",
+        "landmark": "Opp. Race Course Park Gate 2",
+        "instructions": "Please call before delivery and leave at door",
+        "coordinates": "11.0045, 76.9612",
+        "isDefault": true
+      },
+      "items": [
+        {
+          "menuItemId": "item_101",
+          "name": "Hunter's Special Chicken Biriyani",
+          "unitPrice": 220,
+          "quantity": 1,
+          "isVeg": false,
+          "customizations": [
+            {
+              "optionName": "Spice Level",
+              "selectedLabel": "Medium Spice",
+              "price": 0
+            }
+          ],
+          "addons": [],
+          "specialInstructions": "",
+          "totalPrice": 220
+        }
+      ],
+      "orderNotes": "",
+      "subtotal": 220,
+      "deliveryFee": 35,
+      "tax": 11,
+      "discount": 0,
+      "grandTotal": 266,
+      "paymentMethod": "ONLINE",
+      "paymentStatus": "VERIFIED",
+      "paymentTransactionId": "TXN_1789313953772",
+      "status": "PREPARING",
+      "id": "ord_1789313953772",
+      "orderNumber": "HK-20260913-000104",
+      "createdAt": "2026-09-13T15:39:13.772Z",
+      "events": [
+        {
+          "id": "evt_1789313953772",
+          "orderId": "ord_1789313953772",
+          "status": "PLACED",
+          "title": "Order Placed",
+          "description": "Order received & payment confirmed via Online Gateway",
+          "timestamp": "2026-09-13T15:39:13.772Z",
+          "changedBy": "usr_customer_1",
+          "changedByRole": "CUSTOMER"
+        },
+        {
+          "id": "evt_1789313959648",
+          "orderId": "ord_1789313953772",
+          "status": "ACCEPTED",
+          "title": "Order Accepted",
+          "description": "Accepted by Priya Sundaram (CUSTOMER)",
+          "timestamp": "2026-09-13T15:39:19.648Z",
+          "changedBy": "usr_customer_1",
+          "changedByRole": "CUSTOMER"
+        },
+        {
+          "id": "evt_1789313963745",
+          "orderId": "ord_1789313953772",
+          "status": "PREPARING",
+          "title": "Food Preparing",
+          "description": "Kitchen is actively preparing your dishes",
+          "timestamp": "2026-09-13T15:39:23.745Z",
+          "changedBy": "usr_customer_1",
+          "changedByRole": "CUSTOMER"
+        }
+      ],
+      "acceptedAt": "2026-09-13T15:39:19.648Z",
+      "preparingAt": "2026-09-13T15:39:23.745Z"
+    },
+    {
+      "customerId": "usr_customer_1",
+      "customerName": "Sanjay M",
+      "customerPhone": "+91 98765 11111",
+      "items": [
+        {
+          "menuItemId": "item_101",
+          "name": "Hunter's Special Chicken Biriyani",
+          "unitPrice": 220,
+          "quantity": 1,
+          "isVeg": false,
+          "customizations": [],
+          "addons": [],
+          "specialInstructions": "",
+          "totalPrice": 220
+        }
+      ],
+      "subtotal": 220,
+      "deliveryFee": 35,
+      "tax": 11,
+      "discount": 0,
+      "grandTotal": 266,
+      "paymentMethod": "COD",
+      "paymentStatus": "COD_PENDING",
+      "status": "ACCEPTED",
+      "id": "ord_1789313245958",
+      "orderNumber": "HK-20260913-000103",
+      "createdAt": "2026-09-13T15:27:25.958Z",
+      "events": [
+        {
+          "id": "evt_1789313245958",
+          "orderId": "ord_1789313245958",
+          "status": "PLACED",
+          "title": "Order Placed",
+          "description": "Order placed with Cash on Delivery",
+          "timestamp": "2026-09-13T15:27:25.958Z",
+          "changedBy": "usr_customer_1",
+          "changedByRole": "CUSTOMER"
+        },
+        {
+          "id": "evt_1789313897067",
+          "orderId": "ord_1789313245958",
+          "status": "ACCEPTED",
+          "title": "Order Accepted",
+          "description": "Accepted by Priya Sundaram (CUSTOMER)",
+          "timestamp": "2026-09-13T15:38:17.067Z",
+          "changedBy": "usr_customer_1",
+          "changedByRole": "CUSTOMER"
+        }
+      ],
+      "acceptedAt": "2026-09-13T15:38:17.067Z"
+    },
+    {
+      "id": "ord_hist_1",
+      "orderNumber": "HK-20260903-000001",
+      "customerId": "usr_customer_4",
+      "customerName": "Karthik Raja",
+      "customerPhone": "+91 99887 76622",
+      "deliveryAddress": {
+        "id": "addr_h_3",
+        "type": "OTHER",
+        "name": "Friends Place",
+        "phone": "+91 99887 76633",
+        "doorNo": "12",
+        "street": "Avinashi Road",
+        "area": "Peelamedu",
+        "city": "Coimbatore",
+        "pincode": "641004"
+      },
+      "assignedDeliveryPartnerId": "usr_delivery_2",
+      "assignedDeliveryPartnerName": "Karthik Raja",
+      "assignedDeliveryPartnerPhone": "+91 91234 56790",
+      "assignedDeliveryPartnerVehicle": "TN-37-CD-5678",
+      "items": [
+        {
+          "menuItemId": "item_106",
+          "name": "Madurai Bun Parotta (2 Pcs)",
+          "unitPrice": 70,
+          "quantity": 1,
+          "isVeg": true,
+          "customizations": [],
+          "addons": [],
+          "totalPrice": 70
+        }
+      ],
+      "subtotal": 70,
+      "deliveryFee": 35,
+      "tax": 3.5,
+      "discount": 0,
+      "grandTotal": 108.5,
+      "paymentMethod": "ONLINE",
+      "paymentStatus": "PAID_CASH",
+      "status": "DELIVERED",
+      "createdAt": "2026-09-03T09:23:19.688Z",
+      "deliveredAt": "2026-09-03T09:54:19.688Z",
+      "events": []
+    },
+    {
+      "id": "ord_hist_2",
+      "orderNumber": "HK-20260901-000002",
+      "customerId": "usr_customer_1",
+      "customerName": "Priya Sundaram",
+      "customerPhone": "+91 99887 76655",
+      "deliveryAddress": {
+        "id": "addr_h_2",
+        "type": "OFFICE",
+        "name": "Office Address",
+        "phone": "+91 99887 76644",
+        "doorNo": "108",
+        "street": "Trichy Road",
+        "area": "Ramanathapuram",
+        "city": "Coimbatore",
+        "pincode": "641045"
+      },
+      "assignedDeliveryPartnerId": "usr_delivery_3",
+      "assignedDeliveryPartnerName": "Vijay Anand",
+      "assignedDeliveryPartnerPhone": "+91 91234 56791",
+      "assignedDeliveryPartnerVehicle": "TN-37-EF-9012",
+      "items": [
+        {
+          "menuItemId": "item_107",
+          "name": "Ceylon Chicken Kothu Parotta",
+          "unitPrice": 160,
+          "quantity": 1,
+          "isVeg": false,
+          "customizations": [],
+          "addons": [],
+          "totalPrice": 160
+        }
+      ],
+      "subtotal": 160,
+      "deliveryFee": 35,
+      "tax": 8,
+      "discount": 0,
+      "grandTotal": 203,
+      "paymentMethod": "ONLINE",
+      "paymentStatus": "PAID_CASH",
+      "status": "DELIVERED",
+      "createdAt": "2026-09-01T11:29:28.722Z",
+      "deliveredAt": "2026-09-01T12:12:28.722Z",
+      "events": []
+    },
+    {
+      "id": "ord_hist_3",
+      "orderNumber": "HK-20260906-000003",
+      "customerId": "usr_customer_4",
+      "customerName": "Karthik Raja",
+      "customerPhone": "+91 99887 76622",
+      "deliveryAddress": {
+        "id": "addr_h_3",
+        "type": "OTHER",
+        "name": "Friends Place",
+        "phone": "+91 99887 76633",
+        "doorNo": "12",
+        "street": "Avinashi Road",
+        "area": "Peelamedu",
+        "city": "Coimbatore",
+        "pincode": "641004"
+      },
+      "assignedDeliveryPartnerId": "usr_delivery_1",
+      "assignedDeliveryPartnerName": "Arun Kumar",
+      "assignedDeliveryPartnerPhone": "+91 91234 56789",
+      "assignedDeliveryPartnerVehicle": "TN-37-AB-1234",
+      "items": [
+        {
+          "menuItemId": "item_104",
+          "name": "Chicken 65 Boneless",
+          "unitPrice": 220,
+          "quantity": 2,
+          "isVeg": false,
+          "customizations": [],
+          "addons": [],
+          "totalPrice": 440
+        }
+      ],
+      "subtotal": 440,
+      "deliveryFee": 35,
+      "tax": 22,
+      "discount": 0,
+      "grandTotal": 497,
+      "paymentMethod": "ONLINE",
+      "paymentStatus": "PAID_CASH",
+      "status": "DELIVERED",
+      "createdAt": "2026-09-06T09:46:32.481Z",
+      "deliveredAt": "2026-09-06T10:13:32.481Z",
+      "events": []
+    },
+    {
+      "id": "ord_hist_4",
+      "orderNumber": "HK-20260904-000004",
+      "customerId": "usr_customer_5",
+      "customerName": "Arun Kumar",
+      "customerPhone": "+91 99887 76611",
+      "deliveryAddress": {
+        "id": "addr_h_2",
+        "type": "OFFICE",
+        "name": "Office Address",
+        "phone": "+91 99887 76644",
+        "doorNo": "108",
+        "street": "Trichy Road",
+        "area": "Ramanathapuram",
+        "city": "Coimbatore",
+        "pincode": "641045"
+      },
+      "assignedDeliveryPartnerId": "usr_delivery_2",
+      "assignedDeliveryPartnerName": "Karthik Raja",
+      "assignedDeliveryPartnerPhone": "+91 91234 56790",
+      "assignedDeliveryPartnerVehicle": "TN-37-CD-5678",
+      "items": [
+        {
+          "menuItemId": "item_101",
+          "name": "Hunter's Special Chicken Biriyani",
+          "unitPrice": 220,
+          "quantity": 1,
+          "isVeg": false,
+          "customizations": [],
+          "addons": [],
+          "totalPrice": 220
+        },
+        {
+          "menuItemId": "item_102",
+          "name": "Mutton Seeraga Samba Biriyani",
+          "unitPrice": 320,
+          "quantity": 1,
+          "isVeg": false,
+          "customizations": [],
+          "addons": [],
+          "totalPrice": 320
+        }
+      ],
+      "subtotal": 540,
+      "deliveryFee": 0,
+      "tax": 27,
+      "discount": 0,
+      "grandTotal": 567,
+      "paymentMethod": "COD",
+      "paymentStatus": "PAID_CASH",
+      "status": "DELIVERED",
+      "createdAt": "2026-09-04T03:52:25.617Z",
+      "deliveredAt": "2026-09-04T04:29:25.617Z",
+      "events": []
+    },
+    {
+      "id": "ord_hist_5",
+      "orderNumber": "HK-20260907-000005",
+      "customerId": "usr_customer_3",
+      "customerName": "Ananya Ramesh",
+      "customerPhone": "+91 99887 76633",
+      "deliveryAddress": {
+        "id": "addr_h_2",
+        "type": "OFFICE",
+        "name": "Office Address",
+        "phone": "+91 99887 76644",
+        "doorNo": "108",
+        "street": "Trichy Road",
+        "area": "Ramanathapuram",
+        "city": "Coimbatore",
+        "pincode": "641045"
+      },
+      "assignedDeliveryPartnerId": "usr_delivery_3",
+      "assignedDeliveryPartnerName": "Vijay Anand",
+      "assignedDeliveryPartnerPhone": "+91 91234 56791",
+      "assignedDeliveryPartnerVehicle": "TN-37-EF-9012",
+      "items": [
+        {
+          "menuItemId": "item_101",
+          "name": "Hunter's Special Chicken Biriyani",
+          "unitPrice": 220,
+          "quantity": 1,
+          "isVeg": false,
+          "customizations": [],
+          "addons": [],
+          "totalPrice": 220
+        }
+      ],
+      "subtotal": 220,
+      "deliveryFee": 35,
+      "tax": 11,
+      "discount": 0,
+      "grandTotal": 266,
+      "paymentMethod": "ONLINE",
+      "paymentStatus": "PAID_CASH",
+      "status": "DELIVERED",
+      "createdAt": "2026-09-07T14:30:16.354Z",
+      "deliveredAt": "2026-09-07T15:03:16.354Z",
+      "events": []
+    },
+    {
+      "id": "ord_hist_6",
+      "orderNumber": "HK-20260911-000006",
+      "customerId": "usr_customer_2",
+      "customerName": "Rahul Sharma",
+      "customerPhone": "+91 99887 76644",
+      "deliveryAddress": {
+        "id": "addr_h_3",
+        "type": "OTHER",
+        "name": "Friends Place",
+        "phone": "+91 99887 76633",
+        "doorNo": "12",
+        "street": "Avinashi Road",
+        "area": "Peelamedu",
+        "city": "Coimbatore",
+        "pincode": "641004"
+      },
+      "assignedDeliveryPartnerId": "usr_delivery_1",
+      "assignedDeliveryPartnerName": "Arun Kumar",
+      "assignedDeliveryPartnerPhone": "+91 91234 56789",
+      "assignedDeliveryPartnerVehicle": "TN-37-AB-1234",
+      "items": [
+        {
+          "menuItemId": "item_102",
+          "name": "Mutton Seeraga Samba Biriyani",
+          "unitPrice": 320,
+          "quantity": 1,
+          "isVeg": false,
+          "customizations": [],
+          "addons": [],
+          "totalPrice": 320
+        },
+        {
+          "menuItemId": "item_103",
+          "name": "Mushroom Dum Biriyani",
+          "unitPrice": 190,
+          "quantity": 1,
+          "isVeg": true,
+          "customizations": [],
+          "addons": [],
+          "totalPrice": 190
+        }
+      ],
+      "subtotal": 510,
+      "deliveryFee": 0,
+      "tax": 25.5,
+      "discount": 0,
+      "grandTotal": 535.5,
+      "paymentMethod": "COD",
+      "paymentStatus": "PAID_CASH",
+      "status": "DELIVERED",
+      "createdAt": "2026-09-11T09:22:51.997Z",
+      "deliveredAt": "2026-09-11T10:05:51.997Z",
+      "events": []
+    },
+    {
+      "id": "ord_hist_7",
+      "orderNumber": "HK-20260908-000007",
+      "customerId": "usr_customer_1",
+      "customerName": "Priya Sundaram",
+      "customerPhone": "+91 99887 76655",
+      "deliveryAddress": {
+        "id": "addr_h_1",
+        "type": "HOME",
+        "name": "Home Address",
+        "phone": "+91 99887 76655",
+        "doorNo": "42-B",
+        "street": "Greenways Road",
+        "area": "Race Course",
+        "city": "Coimbatore",
+        "pincode": "641018"
+      },
+      "assignedDeliveryPartnerId": "usr_delivery_2",
+      "assignedDeliveryPartnerName": "Karthik Raja",
+      "assignedDeliveryPartnerPhone": "+91 91234 56790",
+      "assignedDeliveryPartnerVehicle": "TN-37-CD-5678",
+      "items": [
+        {
+          "menuItemId": "item_102",
+          "name": "Mutton Seeraga Samba Biriyani",
+          "unitPrice": 320,
+          "quantity": 1,
+          "isVeg": false,
+          "customizations": [],
+          "addons": [],
+          "totalPrice": 320
+        }
+      ],
+      "subtotal": 320,
+      "deliveryFee": 35,
+      "tax": 16,
+      "discount": 0,
+      "grandTotal": 371,
+      "paymentMethod": "ONLINE",
+      "paymentStatus": "PAID_CASH",
+      "status": "DELIVERED",
+      "createdAt": "2026-09-08T09:14:36.696Z",
+      "deliveredAt": "2026-09-08T09:44:36.696Z",
+      "events": []
+    },
+    {
+      "id": "ord_hist_8",
+      "orderNumber": "HK-20260911-000008",
+      "customerId": "usr_customer_4",
+      "customerName": "Karthik Raja",
+      "customerPhone": "+91 99887 76622",
+      "deliveryAddress": {
+        "id": "addr_h_2",
+        "type": "OFFICE",
+        "name": "Office Address",
+        "phone": "+91 99887 76644",
+        "doorNo": "108",
+        "street": "Trichy Road",
+        "area": "Ramanathapuram",
+        "city": "Coimbatore",
+        "pincode": "641045"
+      },
+      "assignedDeliveryPartnerId": "usr_delivery_3",
+      "assignedDeliveryPartnerName": "Vijay Anand",
+      "assignedDeliveryPartnerPhone": "+91 91234 56791",
+      "assignedDeliveryPartnerVehicle": "TN-37-EF-9012",
+      "items": [
+        {
+          "menuItemId": "item_104",
+          "name": "Chicken 65 Boneless",
+          "unitPrice": 220,
+          "quantity": 1,
+          "isVeg": false,
+          "customizations": [],
+          "addons": [],
+          "totalPrice": 220
+        }
+      ],
+      "subtotal": 220,
+      "deliveryFee": 35,
+      "tax": 11,
+      "discount": 0,
+      "grandTotal": 266,
+      "paymentMethod": "ONLINE",
+      "paymentStatus": "PAID_CASH",
+      "status": "DELIVERED",
+      "createdAt": "2026-09-11T05:16:29.798Z",
+      "deliveredAt": "2026-09-11T05:48:29.798Z",
+      "events": []
+    },
+    {
+      "id": "ord_hist_9",
+      "orderNumber": "HK-20260830-000009",
+      "customerId": "usr_customer_3",
+      "customerName": "Ananya Ramesh",
+      "customerPhone": "+91 99887 76633",
+      "deliveryAddress": {
+        "id": "addr_h_3",
+        "type": "OTHER",
+        "name": "Friends Place",
+        "phone": "+91 99887 76633",
+        "doorNo": "12",
+        "street": "Avinashi Road",
+        "area": "Peelamedu",
+        "city": "Coimbatore",
+        "pincode": "641004"
+      },
+      "assignedDeliveryPartnerId": "usr_delivery_1",
+      "assignedDeliveryPartnerName": "Arun Kumar",
+      "assignedDeliveryPartnerPhone": "+91 91234 56789",
+      "assignedDeliveryPartnerVehicle": "TN-37-AB-1234",
+      "items": [
+        {
+          "menuItemId": "item_101",
+          "name": "Hunter's Special Chicken Biriyani",
+          "unitPrice": 220,
+          "quantity": 2,
+          "isVeg": false,
+          "customizations": [],
+          "addons": [],
+          "totalPrice": 440
+        }
+      ],
+      "subtotal": 440,
+      "deliveryFee": 35,
+      "tax": 22,
+      "discount": 0,
+      "grandTotal": 497,
+      "paymentMethod": "ONLINE",
+      "paymentStatus": "PAID_CASH",
+      "status": "DELIVERED",
+      "createdAt": "2026-08-30T03:55:22.727Z",
+      "deliveredAt": "2026-08-30T04:32:22.727Z",
+      "events": []
+    },
+    {
+      "id": "ord_hist_10",
+      "orderNumber": "HK-20260908-000010",
+      "customerId": "usr_customer_3",
+      "customerName": "Ananya Ramesh",
+      "customerPhone": "+91 99887 76633",
+      "deliveryAddress": {
+        "id": "addr_h_2",
+        "type": "OFFICE",
+        "name": "Office Address",
+        "phone": "+91 99887 76644",
+        "doorNo": "108",
+        "street": "Trichy Road",
+        "area": "Ramanathapuram",
+        "city": "Coimbatore",
+        "pincode": "641045"
+      },
+      "assignedDeliveryPartnerId": "usr_delivery_2",
+      "assignedDeliveryPartnerName": "Karthik Raja",
+      "assignedDeliveryPartnerPhone": "+91 91234 56790",
+      "assignedDeliveryPartnerVehicle": "TN-37-CD-5678",
+      "items": [
+        {
+          "menuItemId": "item_107",
+          "name": "Ceylon Chicken Kothu Parotta",
+          "unitPrice": 160,
+          "quantity": 1,
+          "isVeg": false,
+          "customizations": [],
+          "addons": [],
+          "totalPrice": 160
+        },
+        {
+          "menuItemId": "item_106",
+          "name": "Madurai Bun Parotta (2 Pcs)",
+          "unitPrice": 70,
+          "quantity": 1,
+          "isVeg": true,
+          "customizations": [],
+          "addons": [],
+          "totalPrice": 70
+        }
+      ],
+      "subtotal": 230,
+      "deliveryFee": 35,
+      "tax": 11.5,
+      "discount": 0,
+      "grandTotal": 276.5,
+      "paymentMethod": "ONLINE",
+      "paymentStatus": "PAID_CASH",
+      "status": "DELIVERED",
+      "createdAt": "2026-09-08T05:27:13.303Z",
+      "deliveredAt": "2026-09-08T05:56:13.303Z",
+      "events": []
+    },
+    {
+      "id": "ord_hist_11",
+      "orderNumber": "HK-20260831-000011",
+      "customerId": "usr_customer_1",
+      "customerName": "Priya Sundaram",
+      "customerPhone": "+91 99887 76655",
+      "deliveryAddress": {
+        "id": "addr_h_2",
+        "type": "OFFICE",
+        "name": "Office Address",
+        "phone": "+91 99887 76644",
+        "doorNo": "108",
+        "street": "Trichy Road",
+        "area": "Ramanathapuram",
+        "city": "Coimbatore",
+        "pincode": "641045"
+      },
+      "assignedDeliveryPartnerId": "usr_delivery_3",
+      "assignedDeliveryPartnerName": "Vijay Anand",
+      "assignedDeliveryPartnerPhone": "+91 91234 56791",
+      "assignedDeliveryPartnerVehicle": "TN-37-EF-9012",
+      "items": [
+        {
+          "menuItemId": "item_105",
+          "name": "Paneer Tikka Charcoal Grill",
+          "unitPrice": 190,
+          "quantity": 2,
+          "isVeg": true,
+          "customizations": [],
+          "addons": [],
+          "totalPrice": 380
+        }
+      ],
+      "subtotal": 380,
+      "deliveryFee": 35,
+      "tax": 19,
+      "discount": 0,
+      "grandTotal": 434,
+      "paymentMethod": "ONLINE",
+      "paymentStatus": "PAID_CASH",
+      "status": "DELIVERED",
+      "createdAt": "2026-08-31T14:00:08.027Z",
+      "deliveredAt": "2026-08-31T14:43:08.027Z",
+      "events": []
+    },
+    {
+      "id": "ord_hist_12",
+      "orderNumber": "HK-20260831-000012",
+      "customerId": "usr_customer_1",
+      "customerName": "Priya Sundaram",
+      "customerPhone": "+91 99887 76655",
+      "deliveryAddress": {
+        "id": "addr_h_3",
+        "type": "OTHER",
+        "name": "Friends Place",
+        "phone": "+91 99887 76633",
+        "doorNo": "12",
+        "street": "Avinashi Road",
+        "area": "Peelamedu",
+        "city": "Coimbatore",
+        "pincode": "641004"
+      },
+      "assignedDeliveryPartnerId": "usr_delivery_1",
+      "assignedDeliveryPartnerName": "Arun Kumar",
+      "assignedDeliveryPartnerPhone": "+91 91234 56789",
+      "assignedDeliveryPartnerVehicle": "TN-37-AB-1234",
+      "items": [
+        {
+          "menuItemId": "item_107",
+          "name": "Ceylon Chicken Kothu Parotta",
+          "unitPrice": 160,
+          "quantity": 1,
+          "isVeg": false,
+          "customizations": [],
+          "addons": [],
+          "totalPrice": 160
+        },
+        {
+          "menuItemId": "item_101",
+          "name": "Hunter's Special Chicken Biriyani",
+          "unitPrice": 220,
+          "quantity": 1,
+          "isVeg": false,
+          "customizations": [],
+          "addons": [],
+          "totalPrice": 220
+        }
+      ],
+      "subtotal": 380,
+      "deliveryFee": 35,
+      "tax": 19,
+      "discount": 0,
+      "grandTotal": 434,
+      "paymentMethod": "ONLINE",
+      "paymentStatus": "PAID_CASH",
+      "status": "DELIVERED",
+      "createdAt": "2026-08-31T10:03:07.456Z",
+      "deliveredAt": "2026-08-31T10:41:07.456Z",
+      "events": []
+    },
+    {
+      "id": "ord_hist_13",
+      "orderNumber": "HK-20260901-000013",
+      "customerId": "usr_customer_5",
+      "customerName": "Arun Kumar",
+      "customerPhone": "+91 99887 76611",
+      "deliveryAddress": {
+        "id": "addr_h_1",
+        "type": "HOME",
+        "name": "Home Address",
+        "phone": "+91 99887 76655",
+        "doorNo": "42-B",
+        "street": "Greenways Road",
+        "area": "Race Course",
+        "city": "Coimbatore",
+        "pincode": "641018"
+      },
+      "assignedDeliveryPartnerId": "usr_delivery_2",
+      "assignedDeliveryPartnerName": "Karthik Raja",
+      "assignedDeliveryPartnerPhone": "+91 91234 56790",
+      "assignedDeliveryPartnerVehicle": "TN-37-CD-5678",
+      "items": [
+        {
+          "menuItemId": "item_105",
+          "name": "Paneer Tikka Charcoal Grill",
+          "unitPrice": 190,
+          "quantity": 1,
+          "isVeg": true,
+          "customizations": [],
+          "addons": [],
+          "totalPrice": 190
+        },
+        {
+          "menuItemId": "item_102",
+          "name": "Mutton Seeraga Samba Biriyani",
+          "unitPrice": 320,
+          "quantity": 1,
+          "isVeg": false,
+          "customizations": [],
+          "addons": [],
+          "totalPrice": 320
+        }
+      ],
+      "subtotal": 510,
+      "deliveryFee": 0,
+      "tax": 25.5,
+      "discount": 0,
+      "grandTotal": 535.5,
+      "paymentMethod": "ONLINE",
+      "paymentStatus": "PAID_CASH",
+      "status": "DELIVERED",
+      "createdAt": "2026-09-01T12:07:32.360Z",
+      "deliveredAt": "2026-09-01T12:34:32.360Z",
+      "events": []
+    },
+    {
+      "id": "ord_hist_14",
+      "orderNumber": "HK-20260831-000014",
+      "customerId": "usr_customer_5",
+      "customerName": "Arun Kumar",
+      "customerPhone": "+91 99887 76611",
+      "deliveryAddress": {
+        "id": "addr_h_3",
+        "type": "OTHER",
+        "name": "Friends Place",
+        "phone": "+91 99887 76633",
+        "doorNo": "12",
+        "street": "Avinashi Road",
+        "area": "Peelamedu",
+        "city": "Coimbatore",
+        "pincode": "641004"
+      },
+      "assignedDeliveryPartnerId": "usr_delivery_3",
+      "assignedDeliveryPartnerName": "Vijay Anand",
+      "assignedDeliveryPartnerPhone": "+91 91234 56791",
+      "assignedDeliveryPartnerVehicle": "TN-37-EF-9012",
+      "items": [
+        {
+          "menuItemId": "item_107",
+          "name": "Ceylon Chicken Kothu Parotta",
+          "unitPrice": 160,
+          "quantity": 1,
+          "isVeg": false,
+          "customizations": [],
+          "addons": [],
+          "totalPrice": 160
+        }
+      ],
+      "subtotal": 160,
+      "deliveryFee": 35,
+      "tax": 8,
+      "discount": 0,
+      "grandTotal": 203,
+      "paymentMethod": "ONLINE",
+      "paymentStatus": "PAID_CASH",
+      "status": "DELIVERED",
+      "createdAt": "2026-08-31T11:21:36.713Z",
+      "deliveredAt": "2026-08-31T11:51:36.713Z",
+      "events": []
+    },
+    {
+      "id": "ord_hist_15",
+      "orderNumber": "HK-20260903-000015",
+      "customerId": "usr_customer_2",
+      "customerName": "Rahul Sharma",
+      "customerPhone": "+91 99887 76644",
+      "deliveryAddress": {
+        "id": "addr_h_3",
+        "type": "OTHER",
+        "name": "Friends Place",
+        "phone": "+91 99887 76633",
+        "doorNo": "12",
+        "street": "Avinashi Road",
+        "area": "Peelamedu",
+        "city": "Coimbatore",
+        "pincode": "641004"
+      },
+      "assignedDeliveryPartnerId": "usr_delivery_1",
+      "assignedDeliveryPartnerName": "Arun Kumar",
+      "assignedDeliveryPartnerPhone": "+91 91234 56789",
+      "assignedDeliveryPartnerVehicle": "TN-37-AB-1234",
+      "items": [
+        {
+          "menuItemId": "item_103",
+          "name": "Mushroom Dum Biriyani",
+          "unitPrice": 190,
+          "quantity": 1,
+          "isVeg": true,
+          "customizations": [],
+          "addons": [],
+          "totalPrice": 190
+        }
+      ],
+      "subtotal": 190,
+      "deliveryFee": 35,
+      "tax": 9.5,
+      "discount": 0,
+      "grandTotal": 234.5,
+      "paymentMethod": "COD",
+      "paymentStatus": "PAID_CASH",
+      "status": "DELIVERED",
+      "createdAt": "2026-09-03T11:35:45.576Z",
+      "deliveredAt": "2026-09-03T12:16:45.576Z",
+      "events": []
+    },
+    {
+      "id": "ord_hist_16",
+      "orderNumber": "HK-20260911-000016",
+      "customerId": "usr_customer_1",
+      "customerName": "Priya Sundaram",
+      "customerPhone": "+91 99887 76655",
+      "deliveryAddress": {
+        "id": "addr_h_1",
+        "type": "HOME",
+        "name": "Home Address",
+        "phone": "+91 99887 76655",
+        "doorNo": "42-B",
+        "street": "Greenways Road",
+        "area": "Race Course",
+        "city": "Coimbatore",
+        "pincode": "641018"
+      },
+      "assignedDeliveryPartnerId": "usr_delivery_2",
+      "assignedDeliveryPartnerName": "Karthik Raja",
+      "assignedDeliveryPartnerPhone": "+91 91234 56790",
+      "assignedDeliveryPartnerVehicle": "TN-37-CD-5678",
+      "items": [
+        {
+          "menuItemId": "item_104",
+          "name": "Chicken 65 Boneless",
+          "unitPrice": 220,
+          "quantity": 2,
+          "isVeg": false,
+          "customizations": [],
+          "addons": [],
+          "totalPrice": 440
+        }
+      ],
+      "subtotal": 440,
+      "deliveryFee": 35,
+      "tax": 22,
+      "discount": 0,
+      "grandTotal": 497,
+      "paymentMethod": "ONLINE",
+      "paymentStatus": "PAID_CASH",
+      "status": "DELIVERED",
+      "createdAt": "2026-09-11T03:18:58.902Z",
+      "deliveredAt": "2026-09-11T03:46:58.902Z",
+      "events": []
+    },
+    {
+      "id": "ord_hist_17",
+      "orderNumber": "HK-20260901-000017",
+      "customerId": "usr_customer_2",
+      "customerName": "Rahul Sharma",
+      "customerPhone": "+91 99887 76644",
+      "deliveryAddress": {
+        "id": "addr_h_3",
+        "type": "OTHER",
+        "name": "Friends Place",
+        "phone": "+91 99887 76633",
+        "doorNo": "12",
+        "street": "Avinashi Road",
+        "area": "Peelamedu",
+        "city": "Coimbatore",
+        "pincode": "641004"
+      },
+      "assignedDeliveryPartnerId": "usr_delivery_3",
+      "assignedDeliveryPartnerName": "Vijay Anand",
+      "assignedDeliveryPartnerPhone": "+91 91234 56791",
+      "assignedDeliveryPartnerVehicle": "TN-37-EF-9012",
+      "items": [
+        {
+          "menuItemId": "item_101",
+          "name": "Hunter's Special Chicken Biriyani",
+          "unitPrice": 220,
+          "quantity": 1,
+          "isVeg": false,
+          "customizations": [],
+          "addons": [],
+          "totalPrice": 220
+        }
+      ],
+      "subtotal": 220,
+      "deliveryFee": 35,
+      "tax": 11,
+      "discount": 0,
+      "grandTotal": 266,
+      "paymentMethod": "ONLINE",
+      "paymentStatus": "PAID_CASH",
+      "status": "DELIVERED",
+      "createdAt": "2026-09-01T04:35:19.055Z",
+      "deliveredAt": "2026-09-01T05:02:19.055Z",
+      "events": []
+    },
+    {
+      "id": "ord_hist_18",
+      "orderNumber": "HK-20260902-000018",
+      "customerId": "usr_customer_1",
+      "customerName": "Priya Sundaram",
+      "customerPhone": "+91 99887 76655",
+      "deliveryAddress": {
+        "id": "addr_h_3",
+        "type": "OTHER",
+        "name": "Friends Place",
+        "phone": "+91 99887 76633",
+        "doorNo": "12",
+        "street": "Avinashi Road",
+        "area": "Peelamedu",
+        "city": "Coimbatore",
+        "pincode": "641004"
+      },
+      "assignedDeliveryPartnerId": "usr_delivery_1",
+      "assignedDeliveryPartnerName": "Arun Kumar",
+      "assignedDeliveryPartnerPhone": "+91 91234 56789",
+      "assignedDeliveryPartnerVehicle": "TN-37-AB-1234",
+      "items": [
+        {
+          "menuItemId": "item_107",
+          "name": "Ceylon Chicken Kothu Parotta",
+          "unitPrice": 160,
+          "quantity": 1,
+          "isVeg": false,
+          "customizations": [],
+          "addons": [],
+          "totalPrice": 160
+        },
+        {
+          "menuItemId": "item_106",
+          "name": "Madurai Bun Parotta (2 Pcs)",
+          "unitPrice": 70,
+          "quantity": 1,
+          "isVeg": true,
+          "customizations": [],
+          "addons": [],
+          "totalPrice": 70
+        }
+      ],
+      "subtotal": 230,
+      "deliveryFee": 35,
+      "tax": 11.5,
+      "discount": 0,
+      "grandTotal": 276.5,
+      "paymentMethod": "ONLINE",
+      "paymentStatus": "PAID_CASH",
+      "status": "DELIVERED",
+      "createdAt": "2026-09-02T13:13:51.110Z",
+      "deliveredAt": "2026-09-02T13:43:51.110Z",
+      "events": []
+    },
+    {
+      "id": "ord_hist_19",
+      "orderNumber": "HK-20260905-000019",
+      "customerId": "usr_customer_3",
+      "customerName": "Ananya Ramesh",
+      "customerPhone": "+91 99887 76633",
+      "deliveryAddress": {
+        "id": "addr_h_1",
+        "type": "HOME",
+        "name": "Home Address",
+        "phone": "+91 99887 76655",
+        "doorNo": "42-B",
+        "street": "Greenways Road",
+        "area": "Race Course",
+        "city": "Coimbatore",
+        "pincode": "641018"
+      },
+      "assignedDeliveryPartnerId": "usr_delivery_2",
+      "assignedDeliveryPartnerName": "Karthik Raja",
+      "assignedDeliveryPartnerPhone": "+91 91234 56790",
+      "assignedDeliveryPartnerVehicle": "TN-37-CD-5678",
+      "items": [
+        {
+          "menuItemId": "item_102",
+          "name": "Mutton Seeraga Samba Biriyani",
+          "unitPrice": 320,
+          "quantity": 1,
+          "isVeg": false,
+          "customizations": [],
+          "addons": [],
+          "totalPrice": 320
+        },
+        {
+          "menuItemId": "item_106",
+          "name": "Madurai Bun Parotta (2 Pcs)",
+          "unitPrice": 70,
+          "quantity": 1,
+          "isVeg": true,
+          "customizations": [],
+          "addons": [],
+          "totalPrice": 70
+        }
+      ],
+      "subtotal": 390,
+      "deliveryFee": 35,
+      "tax": 19.5,
+      "discount": 0,
+      "grandTotal": 444.5,
+      "paymentMethod": "COD",
+      "paymentStatus": "PAID_CASH",
+      "status": "DELIVERED",
+      "createdAt": "2026-09-05T06:22:24.343Z",
+      "deliveredAt": "2026-09-05T06:51:24.343Z",
+      "events": []
+    },
+    {
+      "id": "ord_hist_20",
+      "orderNumber": "HK-20260831-000020",
+      "customerId": "usr_customer_4",
+      "customerName": "Karthik Raja",
+      "customerPhone": "+91 99887 76622",
+      "deliveryAddress": {
+        "id": "addr_h_1",
+        "type": "HOME",
+        "name": "Home Address",
+        "phone": "+91 99887 76655",
+        "doorNo": "42-B",
+        "street": "Greenways Road",
+        "area": "Race Course",
+        "city": "Coimbatore",
+        "pincode": "641018"
+      },
+      "assignedDeliveryPartnerId": "usr_delivery_3",
+      "assignedDeliveryPartnerName": "Vijay Anand",
+      "assignedDeliveryPartnerPhone": "+91 91234 56791",
+      "assignedDeliveryPartnerVehicle": "TN-37-EF-9012",
+      "items": [
+        {
+          "menuItemId": "item_101",
+          "name": "Hunter's Special Chicken Biriyani",
+          "unitPrice": 220,
+          "quantity": 1,
+          "isVeg": false,
+          "customizations": [],
+          "addons": [],
+          "totalPrice": 220
+        },
+        {
+          "menuItemId": "item_107",
+          "name": "Ceylon Chicken Kothu Parotta",
+          "unitPrice": 160,
+          "quantity": 1,
+          "isVeg": false,
+          "customizations": [],
+          "addons": [],
+          "totalPrice": 160
+        }
+      ],
+      "subtotal": 380,
+      "deliveryFee": 35,
+      "tax": 19,
+      "discount": 0,
+      "grandTotal": 434,
+      "paymentMethod": "ONLINE",
+      "paymentStatus": "PAID_CASH",
+      "status": "DELIVERED",
+      "createdAt": "2026-08-31T08:25:03.277Z",
+      "deliveredAt": "2026-08-31T08:50:03.277Z",
+      "events": []
+    },
+    {
+      "id": "ord_hist_21",
+      "orderNumber": "HK-20260905-000021",
+      "customerId": "usr_customer_1",
+      "customerName": "Priya Sundaram",
+      "customerPhone": "+91 99887 76655",
+      "deliveryAddress": {
+        "id": "addr_h_1",
+        "type": "HOME",
+        "name": "Home Address",
+        "phone": "+91 99887 76655",
+        "doorNo": "42-B",
+        "street": "Greenways Road",
+        "area": "Race Course",
+        "city": "Coimbatore",
+        "pincode": "641018"
+      },
+      "assignedDeliveryPartnerId": "usr_delivery_1",
+      "assignedDeliveryPartnerName": "Arun Kumar",
+      "assignedDeliveryPartnerPhone": "+91 91234 56789",
+      "assignedDeliveryPartnerVehicle": "TN-37-AB-1234",
+      "items": [
+        {
+          "menuItemId": "item_101",
+          "name": "Hunter's Special Chicken Biriyani",
+          "unitPrice": 220,
+          "quantity": 1,
+          "isVeg": false,
+          "customizations": [],
+          "addons": [],
+          "totalPrice": 220
+        },
+        {
+          "menuItemId": "item_104",
+          "name": "Chicken 65 Boneless",
+          "unitPrice": 220,
+          "quantity": 1,
+          "isVeg": false,
+          "customizations": [],
+          "addons": [],
+          "totalPrice": 220
+        }
+      ],
+      "subtotal": 440,
+      "deliveryFee": 35,
+      "tax": 22,
+      "discount": 0,
+      "grandTotal": 497,
+      "paymentMethod": "COD",
+      "paymentStatus": "PAID_CASH",
+      "status": "DELIVERED",
+      "createdAt": "2026-09-05T10:57:29.135Z",
+      "deliveredAt": "2026-09-05T11:24:29.135Z",
+      "events": []
+    },
+    {
+      "id": "ord_hist_22",
+      "orderNumber": "HK-20260904-000022",
+      "customerId": "usr_customer_3",
+      "customerName": "Ananya Ramesh",
+      "customerPhone": "+91 99887 76633",
+      "deliveryAddress": {
+        "id": "addr_h_3",
+        "type": "OTHER",
+        "name": "Friends Place",
+        "phone": "+91 99887 76633",
+        "doorNo": "12",
+        "street": "Avinashi Road",
+        "area": "Peelamedu",
+        "city": "Coimbatore",
+        "pincode": "641004"
+      },
+      "assignedDeliveryPartnerId": "usr_delivery_2",
+      "assignedDeliveryPartnerName": "Karthik Raja",
+      "assignedDeliveryPartnerPhone": "+91 91234 56790",
+      "assignedDeliveryPartnerVehicle": "TN-37-CD-5678",
+      "items": [
+        {
+          "menuItemId": "item_106",
+          "name": "Madurai Bun Parotta (2 Pcs)",
+          "unitPrice": 70,
+          "quantity": 1,
+          "isVeg": true,
+          "customizations": [],
+          "addons": [],
+          "totalPrice": 70
+        },
+        {
+          "menuItemId": "item_103",
+          "name": "Mushroom Dum Biriyani",
+          "unitPrice": 190,
+          "quantity": 1,
+          "isVeg": true,
+          "customizations": [],
+          "addons": [],
+          "totalPrice": 190
+        }
+      ],
+      "subtotal": 260,
+      "deliveryFee": 35,
+      "tax": 13,
+      "discount": 0,
+      "grandTotal": 308,
+      "paymentMethod": "ONLINE",
+      "paymentStatus": "PAID_CASH",
+      "status": "DELIVERED",
+      "createdAt": "2026-09-04T06:25:18.091Z",
+      "deliveredAt": "2026-09-04T06:59:18.091Z",
+      "events": []
+    },
+    {
+      "id": "ord_hist_23",
+      "orderNumber": "HK-20260902-000023",
+      "customerId": "usr_customer_4",
+      "customerName": "Karthik Raja",
+      "customerPhone": "+91 99887 76622",
+      "deliveryAddress": {
+        "id": "addr_h_3",
+        "type": "OTHER",
+        "name": "Friends Place",
+        "phone": "+91 99887 76633",
+        "doorNo": "12",
+        "street": "Avinashi Road",
+        "area": "Peelamedu",
+        "city": "Coimbatore",
+        "pincode": "641004"
+      },
+      "assignedDeliveryPartnerId": "usr_delivery_3",
+      "assignedDeliveryPartnerName": "Vijay Anand",
+      "assignedDeliveryPartnerPhone": "+91 91234 56791",
+      "assignedDeliveryPartnerVehicle": "TN-37-EF-9012",
+      "items": [
+        {
+          "menuItemId": "item_103",
+          "name": "Mushroom Dum Biriyani",
+          "unitPrice": 190,
+          "quantity": 1,
+          "isVeg": true,
+          "customizations": [],
+          "addons": [],
+          "totalPrice": 190
+        },
+        {
+          "menuItemId": "item_107",
+          "name": "Ceylon Chicken Kothu Parotta",
+          "unitPrice": 160,
+          "quantity": 1,
+          "isVeg": false,
+          "customizations": [],
+          "addons": [],
+          "totalPrice": 160
+        }
+      ],
+      "subtotal": 350,
+      "deliveryFee": 35,
+      "tax": 17.5,
+      "discount": 0,
+      "grandTotal": 402.5,
+      "paymentMethod": "ONLINE",
+      "paymentStatus": "PAID_CASH",
+      "status": "DELIVERED",
+      "createdAt": "2026-09-02T04:14:44.959Z",
+      "deliveredAt": "2026-09-02T04:42:44.959Z",
+      "events": []
+    },
+    {
+      "id": "ord_hist_24",
+      "orderNumber": "HK-20260908-000024",
+      "customerId": "usr_customer_4",
+      "customerName": "Karthik Raja",
+      "customerPhone": "+91 99887 76622",
+      "deliveryAddress": {
+        "id": "addr_h_1",
+        "type": "HOME",
+        "name": "Home Address",
+        "phone": "+91 99887 76655",
+        "doorNo": "42-B",
+        "street": "Greenways Road",
+        "area": "Race Course",
+        "city": "Coimbatore",
+        "pincode": "641018"
+      },
+      "assignedDeliveryPartnerId": "usr_delivery_1",
+      "assignedDeliveryPartnerName": "Arun Kumar",
+      "assignedDeliveryPartnerPhone": "+91 91234 56789",
+      "assignedDeliveryPartnerVehicle": "TN-37-AB-1234",
+      "items": [
+        {
+          "menuItemId": "item_101",
+          "name": "Hunter's Special Chicken Biriyani",
+          "unitPrice": 220,
+          "quantity": 1,
+          "isVeg": false,
+          "customizations": [],
+          "addons": [],
+          "totalPrice": 220
+        },
+        {
+          "menuItemId": "item_104",
+          "name": "Chicken 65 Boneless",
+          "unitPrice": 220,
+          "quantity": 1,
+          "isVeg": false,
+          "customizations": [],
+          "addons": [],
+          "totalPrice": 220
+        }
+      ],
+      "subtotal": 440,
+      "deliveryFee": 35,
+      "tax": 22,
+      "discount": 0,
+      "grandTotal": 497,
+      "paymentMethod": "ONLINE",
+      "paymentStatus": "PAID_CASH",
+      "status": "DELIVERED",
+      "createdAt": "2026-09-08T09:53:02.531Z",
+      "deliveredAt": "2026-09-08T10:19:02.531Z",
+      "events": []
+    },
+    {
+      "id": "ord_hist_25",
+      "orderNumber": "HK-20260907-000025",
+      "customerId": "usr_customer_1",
+      "customerName": "Priya Sundaram",
+      "customerPhone": "+91 99887 76655",
+      "deliveryAddress": {
+        "id": "addr_h_2",
+        "type": "OFFICE",
+        "name": "Office Address",
+        "phone": "+91 99887 76644",
+        "doorNo": "108",
+        "street": "Trichy Road",
+        "area": "Ramanathapuram",
+        "city": "Coimbatore",
+        "pincode": "641045"
+      },
+      "assignedDeliveryPartnerId": "usr_delivery_2",
+      "assignedDeliveryPartnerName": "Karthik Raja",
+      "assignedDeliveryPartnerPhone": "+91 91234 56790",
+      "assignedDeliveryPartnerVehicle": "TN-37-CD-5678",
+      "items": [
+        {
+          "menuItemId": "item_105",
+          "name": "Paneer Tikka Charcoal Grill",
+          "unitPrice": 190,
+          "quantity": 1,
+          "isVeg": true,
+          "customizations": [],
+          "addons": [],
+          "totalPrice": 190
+        }
+      ],
+      "subtotal": 190,
+      "deliveryFee": 35,
+      "tax": 9.5,
+      "discount": 0,
+      "grandTotal": 234.5,
+      "paymentMethod": "ONLINE",
+      "paymentStatus": "PAID_CASH",
+      "status": "DELIVERED",
+      "createdAt": "2026-09-07T10:48:15.299Z",
+      "deliveredAt": "2026-09-07T11:13:15.299Z",
+      "events": []
+    },
+    {
+      "id": "ord_hist_26",
+      "orderNumber": "HK-20260909-000026",
+      "customerId": "usr_customer_5",
+      "customerName": "Arun Kumar",
+      "customerPhone": "+91 99887 76611",
+      "deliveryAddress": {
+        "id": "addr_h_3",
+        "type": "OTHER",
+        "name": "Friends Place",
+        "phone": "+91 99887 76633",
+        "doorNo": "12",
+        "street": "Avinashi Road",
+        "area": "Peelamedu",
+        "city": "Coimbatore",
+        "pincode": "641004"
+      },
+      "assignedDeliveryPartnerId": "usr_delivery_3",
+      "assignedDeliveryPartnerName": "Vijay Anand",
+      "assignedDeliveryPartnerPhone": "+91 91234 56791",
+      "assignedDeliveryPartnerVehicle": "TN-37-EF-9012",
+      "items": [
+        {
+          "menuItemId": "item_101",
+          "name": "Hunter's Special Chicken Biriyani",
+          "unitPrice": 220,
+          "quantity": 1,
+          "isVeg": false,
+          "customizations": [],
+          "addons": [],
+          "totalPrice": 220
+        },
+        {
+          "menuItemId": "item_106",
+          "name": "Madurai Bun Parotta (2 Pcs)",
+          "unitPrice": 70,
+          "quantity": 1,
+          "isVeg": true,
+          "customizations": [],
+          "addons": [],
+          "totalPrice": 70
+        }
+      ],
+      "subtotal": 290,
+      "deliveryFee": 35,
+      "tax": 14.5,
+      "discount": 0,
+      "grandTotal": 339.5,
+      "paymentMethod": "COD",
+      "paymentStatus": "PAID_CASH",
+      "status": "DELIVERED",
+      "createdAt": "2026-09-09T11:10:30.693Z",
+      "deliveredAt": "2026-09-09T11:45:30.693Z",
+      "events": []
+    },
+    {
+      "id": "ord_hist_27",
+      "orderNumber": "HK-20260903-000027",
+      "customerId": "usr_customer_4",
+      "customerName": "Karthik Raja",
+      "customerPhone": "+91 99887 76622",
+      "deliveryAddress": {
+        "id": "addr_h_3",
+        "type": "OTHER",
+        "name": "Friends Place",
+        "phone": "+91 99887 76633",
+        "doorNo": "12",
+        "street": "Avinashi Road",
+        "area": "Peelamedu",
+        "city": "Coimbatore",
+        "pincode": "641004"
+      },
+      "assignedDeliveryPartnerId": "usr_delivery_1",
+      "assignedDeliveryPartnerName": "Arun Kumar",
+      "assignedDeliveryPartnerPhone": "+91 91234 56789",
+      "assignedDeliveryPartnerVehicle": "TN-37-AB-1234",
+      "items": [
+        {
+          "menuItemId": "item_102",
+          "name": "Mutton Seeraga Samba Biriyani",
+          "unitPrice": 320,
+          "quantity": 1,
+          "isVeg": false,
+          "customizations": [],
+          "addons": [],
+          "totalPrice": 320
+        }
+      ],
+      "subtotal": 320,
+      "deliveryFee": 35,
+      "tax": 16,
+      "discount": 0,
+      "grandTotal": 371,
+      "paymentMethod": "ONLINE",
+      "paymentStatus": "PAID_CASH",
+      "status": "DELIVERED",
+      "createdAt": "2026-09-03T09:39:32.393Z",
+      "deliveredAt": "2026-09-03T10:14:32.393Z",
+      "events": []
+    },
+    {
+      "id": "ord_hist_28",
+      "orderNumber": "HK-20260906-000028",
+      "customerId": "usr_customer_1",
+      "customerName": "Priya Sundaram",
+      "customerPhone": "+91 99887 76655",
+      "deliveryAddress": {
+        "id": "addr_h_3",
+        "type": "OTHER",
+        "name": "Friends Place",
+        "phone": "+91 99887 76633",
+        "doorNo": "12",
+        "street": "Avinashi Road",
+        "area": "Peelamedu",
+        "city": "Coimbatore",
+        "pincode": "641004"
+      },
+      "assignedDeliveryPartnerId": "usr_delivery_2",
+      "assignedDeliveryPartnerName": "Karthik Raja",
+      "assignedDeliveryPartnerPhone": "+91 91234 56790",
+      "assignedDeliveryPartnerVehicle": "TN-37-CD-5678",
+      "items": [
+        {
+          "menuItemId": "item_104",
+          "name": "Chicken 65 Boneless",
+          "unitPrice": 220,
+          "quantity": 1,
+          "isVeg": false,
+          "customizations": [],
+          "addons": [],
+          "totalPrice": 220
+        },
+        {
+          "menuItemId": "item_105",
+          "name": "Paneer Tikka Charcoal Grill",
+          "unitPrice": 190,
+          "quantity": 1,
+          "isVeg": true,
+          "customizations": [],
+          "addons": [],
+          "totalPrice": 190
+        }
+      ],
+      "subtotal": 410,
+      "deliveryFee": 35,
+      "tax": 20.5,
+      "discount": 0,
+      "grandTotal": 465.5,
+      "paymentMethod": "ONLINE",
+      "paymentStatus": "PAID_CASH",
+      "status": "DELIVERED",
+      "createdAt": "2026-09-06T05:35:54.040Z",
+      "deliveredAt": "2026-09-06T06:02:54.040Z",
+      "events": []
+    },
+    {
+      "id": "ord_hist_29",
+      "orderNumber": "HK-20260906-000029",
+      "customerId": "usr_customer_1",
+      "customerName": "Priya Sundaram",
+      "customerPhone": "+91 99887 76655",
+      "deliveryAddress": {
+        "id": "addr_h_2",
+        "type": "OFFICE",
+        "name": "Office Address",
+        "phone": "+91 99887 76644",
+        "doorNo": "108",
+        "street": "Trichy Road",
+        "area": "Ramanathapuram",
+        "city": "Coimbatore",
+        "pincode": "641045"
+      },
+      "assignedDeliveryPartnerId": "usr_delivery_3",
+      "assignedDeliveryPartnerName": "Vijay Anand",
+      "assignedDeliveryPartnerPhone": "+91 91234 56791",
+      "assignedDeliveryPartnerVehicle": "TN-37-EF-9012",
+      "items": [
+        {
+          "menuItemId": "item_102",
+          "name": "Mutton Seeraga Samba Biriyani",
+          "unitPrice": 320,
+          "quantity": 1,
+          "isVeg": false,
+          "customizations": [],
+          "addons": [],
+          "totalPrice": 320
+        }
+      ],
+      "subtotal": 320,
+      "deliveryFee": 35,
+      "tax": 16,
+      "discount": 0,
+      "grandTotal": 371,
+      "paymentMethod": "ONLINE",
+      "paymentStatus": "PAID_CASH",
+      "status": "DELIVERED",
+      "createdAt": "2026-09-06T12:21:34.820Z",
+      "deliveredAt": "2026-09-06T12:54:34.820Z",
+      "events": []
+    },
+    {
+      "id": "ord_hist_30",
+      "orderNumber": "HK-20260910-000030",
+      "customerId": "usr_customer_2",
+      "customerName": "Rahul Sharma",
+      "customerPhone": "+91 99887 76644",
+      "deliveryAddress": {
+        "id": "addr_h_3",
+        "type": "OTHER",
+        "name": "Friends Place",
+        "phone": "+91 99887 76633",
+        "doorNo": "12",
+        "street": "Avinashi Road",
+        "area": "Peelamedu",
+        "city": "Coimbatore",
+        "pincode": "641004"
+      },
+      "assignedDeliveryPartnerId": "usr_delivery_1",
+      "assignedDeliveryPartnerName": "Arun Kumar",
+      "assignedDeliveryPartnerPhone": "+91 91234 56789",
+      "assignedDeliveryPartnerVehicle": "TN-37-AB-1234",
+      "items": [
+        {
+          "menuItemId": "item_101",
+          "name": "Hunter's Special Chicken Biriyani",
+          "unitPrice": 220,
+          "quantity": 1,
+          "isVeg": false,
+          "customizations": [],
+          "addons": [],
+          "totalPrice": 220
+        },
+        {
+          "menuItemId": "item_103",
+          "name": "Mushroom Dum Biriyani",
+          "unitPrice": 190,
+          "quantity": 1,
+          "isVeg": true,
+          "customizations": [],
+          "addons": [],
+          "totalPrice": 190
+        }
+      ],
+      "subtotal": 410,
+      "deliveryFee": 35,
+      "tax": 20.5,
+      "discount": 0,
+      "grandTotal": 465.5,
+      "paymentMethod": "COD",
+      "paymentStatus": "PAID_CASH",
+      "status": "DELIVERED",
+      "createdAt": "2026-09-10T06:02:40.500Z",
+      "deliveredAt": "2026-09-10T06:43:40.500Z",
+      "events": []
+    },
+    {
+      "id": "ord_hist_31",
+      "orderNumber": "HK-20260907-000031",
+      "customerId": "usr_customer_1",
+      "customerName": "Priya Sundaram",
+      "customerPhone": "+91 99887 76655",
+      "deliveryAddress": {
+        "id": "addr_h_3",
+        "type": "OTHER",
+        "name": "Friends Place",
+        "phone": "+91 99887 76633",
+        "doorNo": "12",
+        "street": "Avinashi Road",
+        "area": "Peelamedu",
+        "city": "Coimbatore",
+        "pincode": "641004"
+      },
+      "assignedDeliveryPartnerId": "usr_delivery_2",
+      "assignedDeliveryPartnerName": "Karthik Raja",
+      "assignedDeliveryPartnerPhone": "+91 91234 56790",
+      "assignedDeliveryPartnerVehicle": "TN-37-CD-5678",
+      "items": [
+        {
+          "menuItemId": "item_105",
+          "name": "Paneer Tikka Charcoal Grill",
+          "unitPrice": 190,
+          "quantity": 1,
+          "isVeg": true,
+          "customizations": [],
+          "addons": [],
+          "totalPrice": 190
+        },
+        {
+          "menuItemId": "item_103",
+          "name": "Mushroom Dum Biriyani",
+          "unitPrice": 190,
+          "quantity": 1,
+          "isVeg": true,
+          "customizations": [],
+          "addons": [],
+          "totalPrice": 190
+        }
+      ],
+      "subtotal": 380,
+      "deliveryFee": 35,
+      "tax": 19,
+      "discount": 0,
+      "grandTotal": 434,
+      "paymentMethod": "COD",
+      "paymentStatus": "PAID_CASH",
+      "status": "DELIVERED",
+      "createdAt": "2026-09-07T14:52:07.407Z",
+      "deliveredAt": "2026-09-07T15:23:07.407Z",
+      "events": []
+    },
+    {
+      "id": "ord_hist_32",
+      "orderNumber": "HK-20260909-000032",
+      "customerId": "usr_customer_4",
+      "customerName": "Karthik Raja",
+      "customerPhone": "+91 99887 76622",
+      "deliveryAddress": {
+        "id": "addr_h_3",
+        "type": "OTHER",
+        "name": "Friends Place",
+        "phone": "+91 99887 76633",
+        "doorNo": "12",
+        "street": "Avinashi Road",
+        "area": "Peelamedu",
+        "city": "Coimbatore",
+        "pincode": "641004"
+      },
+      "assignedDeliveryPartnerId": "usr_delivery_3",
+      "assignedDeliveryPartnerName": "Vijay Anand",
+      "assignedDeliveryPartnerPhone": "+91 91234 56791",
+      "assignedDeliveryPartnerVehicle": "TN-37-EF-9012",
+      "items": [
+        {
+          "menuItemId": "item_102",
+          "name": "Mutton Seeraga Samba Biriyani",
+          "unitPrice": 320,
+          "quantity": 1,
+          "isVeg": false,
+          "customizations": [],
+          "addons": [],
+          "totalPrice": 320
+        },
+        {
+          "menuItemId": "item_106",
+          "name": "Madurai Bun Parotta (2 Pcs)",
+          "unitPrice": 70,
+          "quantity": 1,
+          "isVeg": true,
+          "customizations": [],
+          "addons": [],
+          "totalPrice": 70
+        }
+      ],
+      "subtotal": 390,
+      "deliveryFee": 35,
+      "tax": 19.5,
+      "discount": 0,
+      "grandTotal": 444.5,
+      "paymentMethod": "ONLINE",
+      "paymentStatus": "PAID_CASH",
+      "status": "DELIVERED",
+      "createdAt": "2026-09-09T08:38:04.231Z",
+      "deliveredAt": "2026-09-09T09:19:04.231Z",
+      "events": []
+    },
+    {
+      "id": "ord_hist_33",
+      "orderNumber": "HK-20260902-000033",
+      "customerId": "usr_customer_5",
+      "customerName": "Arun Kumar",
+      "customerPhone": "+91 99887 76611",
+      "deliveryAddress": {
+        "id": "addr_h_1",
+        "type": "HOME",
+        "name": "Home Address",
+        "phone": "+91 99887 76655",
+        "doorNo": "42-B",
+        "street": "Greenways Road",
+        "area": "Race Course",
+        "city": "Coimbatore",
+        "pincode": "641018"
+      },
+      "assignedDeliveryPartnerId": "usr_delivery_1",
+      "assignedDeliveryPartnerName": "Arun Kumar",
+      "assignedDeliveryPartnerPhone": "+91 91234 56789",
+      "assignedDeliveryPartnerVehicle": "TN-37-AB-1234",
+      "items": [
+        {
+          "menuItemId": "item_107",
+          "name": "Ceylon Chicken Kothu Parotta",
+          "unitPrice": 160,
+          "quantity": 1,
+          "isVeg": false,
+          "customizations": [],
+          "addons": [],
+          "totalPrice": 160
+        },
+        {
+          "menuItemId": "item_105",
+          "name": "Paneer Tikka Charcoal Grill",
+          "unitPrice": 190,
+          "quantity": 1,
+          "isVeg": true,
+          "customizations": [],
+          "addons": [],
+          "totalPrice": 190
+        }
+      ],
+      "subtotal": 350,
+      "deliveryFee": 35,
+      "tax": 17.5,
+      "discount": 0,
+      "grandTotal": 402.5,
+      "paymentMethod": "COD",
+      "paymentStatus": "PAID_CASH",
+      "status": "DELIVERED",
+      "createdAt": "2026-09-02T04:11:02.105Z",
+      "deliveredAt": "2026-09-02T04:52:02.105Z",
+      "events": []
+    },
+    {
+      "id": "ord_hist_34",
+      "orderNumber": "HK-20260908-000034",
+      "customerId": "usr_customer_2",
+      "customerName": "Rahul Sharma",
+      "customerPhone": "+91 99887 76644",
+      "deliveryAddress": {
+        "id": "addr_h_1",
+        "type": "HOME",
+        "name": "Home Address",
+        "phone": "+91 99887 76655",
+        "doorNo": "42-B",
+        "street": "Greenways Road",
+        "area": "Race Course",
+        "city": "Coimbatore",
+        "pincode": "641018"
+      },
+      "assignedDeliveryPartnerId": "usr_delivery_2",
+      "assignedDeliveryPartnerName": "Karthik Raja",
+      "assignedDeliveryPartnerPhone": "+91 91234 56790",
+      "assignedDeliveryPartnerVehicle": "TN-37-CD-5678",
+      "items": [
+        {
+          "menuItemId": "item_104",
+          "name": "Chicken 65 Boneless",
+          "unitPrice": 220,
+          "quantity": 1,
+          "isVeg": false,
+          "customizations": [],
+          "addons": [],
+          "totalPrice": 220
+        }
+      ],
+      "subtotal": 220,
+      "deliveryFee": 35,
+      "tax": 11,
+      "discount": 0,
+      "grandTotal": 266,
+      "paymentMethod": "ONLINE",
+      "paymentStatus": "PAID_CASH",
+      "status": "DELIVERED",
+      "createdAt": "2026-09-08T12:47:15.459Z",
+      "deliveredAt": "2026-09-08T13:12:15.459Z",
+      "events": []
+    },
+    {
+      "id": "ord_hist_35",
+      "orderNumber": "HK-20260901-000035",
+      "customerId": "usr_customer_5",
+      "customerName": "Arun Kumar",
+      "customerPhone": "+91 99887 76611",
+      "deliveryAddress": {
+        "id": "addr_h_1",
+        "type": "HOME",
+        "name": "Home Address",
+        "phone": "+91 99887 76655",
+        "doorNo": "42-B",
+        "street": "Greenways Road",
+        "area": "Race Course",
+        "city": "Coimbatore",
+        "pincode": "641018"
+      },
+      "assignedDeliveryPartnerId": "usr_delivery_3",
+      "assignedDeliveryPartnerName": "Vijay Anand",
+      "assignedDeliveryPartnerPhone": "+91 91234 56791",
+      "assignedDeliveryPartnerVehicle": "TN-37-EF-9012",
+      "items": [
+        {
+          "menuItemId": "item_102",
+          "name": "Mutton Seeraga Samba Biriyani",
+          "unitPrice": 320,
+          "quantity": 1,
+          "isVeg": false,
+          "customizations": [],
+          "addons": [],
+          "totalPrice": 320
+        },
+        {
+          "menuItemId": "item_104",
+          "name": "Chicken 65 Boneless",
+          "unitPrice": 220,
+          "quantity": 1,
+          "isVeg": false,
+          "customizations": [],
+          "addons": [],
+          "totalPrice": 220
+        }
+      ],
+      "subtotal": 540,
+      "deliveryFee": 0,
+      "tax": 27,
+      "discount": 0,
+      "grandTotal": 567,
+      "paymentMethod": "ONLINE",
+      "paymentStatus": "PAID_CASH",
+      "status": "DELIVERED",
+      "createdAt": "2026-09-01T04:38:42.503Z",
+      "deliveredAt": "2026-09-01T05:07:42.503Z",
+      "events": []
+    },
+    {
+      "id": "ord_1001",
+      "orderNumber": "HK-20260812-000101",
+      "customerId": "usr_customer_1",
+      "customerName": "Priya Sundaram",
+      "customerPhone": "+91 99887 76655",
+      "deliveryAddress": {
+        "id": "addr_1",
+        "type": "HOME",
+        "name": "Priya Sundaram",
+        "phone": "+91 99887 76655",
+        "doorNo": "42-B",
+        "street": "Greenways Road",
+        "area": "Race Course",
+        "city": "Coimbatore",
+        "pincode": "641018",
+        "landmark": "Opp. Park Gate 2"
+      },
+      "items": [
+        {
+          "menuItemId": "item_101",
+          "name": "Hunter's Special Chicken Biriyani",
+          "unitPrice": 220,
+          "quantity": 2,
+          "isVeg": false,
+          "customizations": [
+            {
+              "optionName": "Spice Level",
+              "selectedLabel": "Authentic Spicy",
+              "price": 0
+            }
+          ],
+          "addons": [
+            {
+              "addonId": "add_egg",
+              "name": "Boiled Egg (1 Pc)",
+              "price": 15
+            }
+          ],
+          "specialInstructions": "Extra spicy please!",
+          "totalPrice": 470
+        },
+        {
+          "menuItemId": "item_104",
+          "name": "Chicken 65 Boneless",
+          "unitPrice": 220,
+          "quantity": 1,
+          "isVeg": false,
+          "customizations": [],
+          "addons": [],
+          "totalPrice": 220
+        }
+      ],
+      "orderNotes": "Please pack extra raitha and include spoons.",
+      "subtotal": 690,
+      "deliveryFee": 0,
+      "tax": 34.5,
+      "discount": 0,
+      "grandTotal": 724.5,
+      "paymentMethod": "ONLINE",
+      "paymentStatus": "VERIFIED",
+      "paymentTransactionId": "TXN_987123984712",
+      "status": "PREPARING",
+      "createdAt": "2026-09-13T14:48:23.859Z",
+      "acceptedAt": "2026-09-13T14:51:23.860Z",
+      "preparingAt": "2026-09-13T14:54:23.860Z",
+      "events": [
+        {
+          "id": "evt_1",
+          "orderId": "ord_1001",
+          "status": "PLACED",
+          "title": "Order Placed",
+          "description": "Order received and payment verified via Online Gateway",
+          "timestamp": "2026-09-13T14:48:23.860Z",
+          "changedBy": "usr_customer_1",
+          "changedByRole": "CUSTOMER"
+        },
+        {
+          "id": "evt_2",
+          "orderId": "ord_1001",
+          "status": "ACCEPTED",
+          "title": "Order Accepted",
+          "description": "Accepted by Kitchen Staff Manoj Kumar",
+          "timestamp": "2026-09-13T14:51:23.860Z",
+          "changedBy": "usr_staff_1",
+          "changedByRole": "STAFF"
+        },
+        {
+          "id": "evt_3",
+          "orderId": "ord_1001",
+          "status": "PREPARING",
+          "title": "Food Preparing",
+          "description": "Chef is preparing your meals in the kitchen",
+          "timestamp": "2026-09-13T14:54:23.860Z",
+          "changedBy": "usr_staff_1",
+          "changedByRole": "STAFF"
+        }
+      ]
+    },
+    {
+      "id": "ord_1002",
+      "orderNumber": "HK-20260812-000102",
+      "customerId": "usr_customer_2",
+      "customerName": "Rahul Sharma",
+      "customerPhone": "+91 99887 76644",
+      "deliveryAddress": {
+        "id": "addr_rahul",
+        "type": "HOME",
+        "name": "Rahul Sharma",
+        "phone": "+91 99887 76644",
+        "doorNo": "108",
+        "street": "Trichy Road",
+        "area": "Ramanathapuram",
+        "city": "Coimbatore",
+        "pincode": "641045"
+      },
+      "items": [
+        {
+          "menuItemId": "item_102",
+          "name": "Mutton Seeraga Samba Biriyani",
+          "unitPrice": 320,
+          "quantity": 1,
+          "isVeg": false,
+          "customizations": [],
+          "addons": [],
+          "totalPrice": 320
+        },
+        {
+          "menuItemId": "item_110",
+          "name": "Elaneer Payasam (Tender Coconut)",
+          "unitPrice": 120,
+          "quantity": 2,
+          "isVeg": true,
+          "customizations": [],
+          "addons": [],
+          "totalPrice": 240
+        }
+      ],
+      "subtotal": 560,
+      "deliveryFee": 0,
+      "tax": 28,
+      "discount": 0,
+      "grandTotal": 588,
+      "paymentMethod": "COD",
+      "paymentStatus": "COD_PENDING",
+      "status": "ASSIGNED",
+      "createdAt": "2026-09-13T14:31:23.860Z",
+      "acceptedAt": "2026-09-13T14:36:23.860Z",
+      "preparingAt": "2026-09-13T14:41:23.860Z",
+      "readyAt": "2026-09-13T15:01:23.860Z",
+      "events": [
+        {
+          "id": "evt_1002_1",
+          "orderId": "ord_1002",
+          "status": "PLACED",
+          "title": "Order Placed",
+          "description": "Order placed with Cash on Delivery option",
+          "timestamp": "2026-09-13T14:31:23.860Z",
+          "changedBy": "usr_customer_2",
+          "changedByRole": "CUSTOMER"
+        },
+        {
+          "id": "evt_1002_2",
+          "orderId": "ord_1002",
+          "status": "ACCEPTED",
+          "title": "Order Accepted",
+          "description": "Order accepted by Owner Chef Senthil",
+          "timestamp": "2026-09-13T14:36:23.860Z",
+          "changedBy": "usr_owner_1",
+          "changedByRole": "OWNER"
+        },
+        {
+          "id": "evt_1002_3",
+          "orderId": "ord_1002",
+          "status": "PREPARING",
+          "title": "Food Preparing",
+          "description": "Kitchen actively preparing mutton biriyani",
+          "timestamp": "2026-09-13T14:41:23.860Z",
+          "changedBy": "usr_staff_1",
+          "changedByRole": "STAFF"
+        },
+        {
+          "id": "evt_1002_4",
+          "orderId": "ord_1002",
+          "status": "READY",
+          "title": "Food Ready for Pickup",
+          "description": "Order packed & awaiting delivery partner assignment",
+          "timestamp": "2026-09-13T15:01:23.860Z",
+          "changedBy": "usr_staff_1",
+          "changedByRole": "STAFF"
+        },
+        {
+          "id": "evt_1789549154240",
+          "orderId": "ord_1002",
+          "status": "ASSIGNED",
+          "title": "Delivery Partner Assigned",
+          "description": "Assigned to Arun Kumar",
+          "timestamp": "2026-09-16T08:59:14.238Z",
+          "changedBy": "usr_owner_1",
+          "changedByRole": "OWNER"
+        }
+      ],
+      "version": 2,
+      "updatedAt": "2026-09-16T08:59:14.238Z",
+      "assignedDeliveryPartnerId": "usr_delivery_1",
+      "assignedDeliveryPartnerName": "Arun Kumar",
+      "assignedDeliveryPartnerPhone": "+91 91234 56789",
+      "assignedDeliveryPartnerVehicle": "TN-37-AB-1234"
+    }
+  ],
+  "deliveryBatches": [],
+  "reviews": [
+    {
+      "id": "rev_1",
+      "orderId": "ord_hist_0",
+      "orderNumber": "HK-20260811-000095",
+      "customerId": "usr_customer_1",
+      "customerName": "Priya Sundaram",
+      "foodRating": 5,
+      "deliveryRating": 5,
+      "overallRating": 5,
+      "comment": "The Hunter's special biriyani was incredibly fragrant and rich! Delivery driver Arun arrived hot and fresh.",
+      "createdAt": "2026-09-12T15:06:23.860Z",
+      "itemRatings": [
+        {
+          "menuItemId": "item_101",
+          "menuItemName": "Hunter's Special Chicken Biriyani",
+          "rating": 5,
+          "comment": "Authentic seeraga samba rice and super tender chicken. Loved the spice level!"
+        },
+        {
+          "menuItemId": "item_104",
+          "menuItemName": "Chicken 65 Boneless",
+          "rating": 5,
+          "comment": "Crispy and juicy boneless chicken pieces!"
+        }
+      ]
+    },
+    {
+      "id": "rev_2",
+      "orderId": "ord_hist_1",
+      "orderNumber": "HK-20260810-000088",
+      "customerId": "usr_customer_2",
+      "customerName": "Karthik Raja",
+      "foodRating": 5,
+      "deliveryRating": 4,
+      "overallRating": 5,
+      "comment": "Best mutton biriyani in town! Soft meat that melts in mouth.",
+      "createdAt": "2026-09-11T15:06:23.860Z",
+      "itemRatings": [
+        {
+          "menuItemId": "item_102",
+          "menuItemName": "Mutton Seeraga Samba Biriyani",
+          "rating": 5,
+          "comment": "Pure ghee flavour and bone marrow was sublime!"
+        }
+      ]
+    },
+    {
+      "id": "rev_3",
+      "orderId": "ord_hist_2",
+      "orderNumber": "HK-20260809-000072",
+      "customerId": "usr_customer_3",
+      "customerName": "Ananya Ramesh",
+      "foodRating": 4,
+      "deliveryRating": 5,
+      "overallRating": 4,
+      "comment": "Flaky bun parottas paired with chicken salna were divine.",
+      "createdAt": "2026-09-10T15:06:23.860Z",
+      "itemRatings": [
+        {
+          "menuItemId": "item_107",
+          "menuItemName": "Madurai Bun Parotta (2 Pcs)",
+          "rating": 5,
+          "comment": "Super soft and flaky bun parotta, perfect salna combo!"
+        }
+      ]
+    },
+    {
+      "id": "rev_generated_3",
+      "orderId": "ord_hist_3",
+      "orderNumber": "HK-20260906-000003",
+      "customerId": "usr_customer_4",
+      "customerName": "Karthik Raja",
+      "foodRating": 5,
+      "deliveryRating": 5,
+      "overallRating": 5,
+      "comment": "Very neat and professional service.",
+      "createdAt": "2026-09-06T10:13:32.481Z"
+    },
+    {
+      "id": "rev_generated_5",
+      "orderId": "ord_hist_5",
+      "orderNumber": "HK-20260907-000005",
+      "customerId": "usr_customer_3",
+      "customerName": "Ananya Ramesh",
+      "foodRating": 5,
+      "deliveryRating": 5,
+      "overallRating": 5,
+      "comment": "Super fast delivery, extremely friendly executive!",
+      "createdAt": "2026-09-07T15:03:16.354Z"
+    },
+    {
+      "id": "rev_generated_6",
+      "orderId": "ord_hist_6",
+      "orderNumber": "HK-20260911-000006",
+      "customerId": "usr_customer_2",
+      "customerName": "Rahul Sharma",
+      "foodRating": 5,
+      "deliveryRating": 5,
+      "overallRating": 5,
+      "comment": "Excellent and fast delivery!",
+      "createdAt": "2026-09-11T10:05:51.997Z"
+    },
+    {
+      "id": "rev_generated_9",
+      "orderId": "ord_hist_9",
+      "orderNumber": "HK-20260830-000009",
+      "customerId": "usr_customer_3",
+      "customerName": "Ananya Ramesh",
+      "foodRating": 5,
+      "deliveryRating": 5,
+      "overallRating": 5,
+      "comment": "Very neat and professional service.",
+      "createdAt": "2026-08-30T04:32:22.727Z"
+    },
+    {
+      "id": "rev_generated_10",
+      "orderId": "ord_hist_10",
+      "orderNumber": "HK-20260908-000010",
+      "customerId": "usr_customer_3",
+      "customerName": "Ananya Ramesh",
+      "foodRating": 4,
+      "deliveryRating": 4,
+      "overallRating": 4,
+      "comment": "The food was piping hot when it arrived. Perfect delivery!",
+      "createdAt": "2026-09-08T05:56:13.303Z"
+    },
+    {
+      "id": "rev_generated_12",
+      "orderId": "ord_hist_12",
+      "orderNumber": "HK-20260831-000012",
+      "customerId": "usr_customer_1",
+      "customerName": "Priya Sundaram",
+      "foodRating": 5,
+      "deliveryRating": 5,
+      "overallRating": 5,
+      "comment": "Excellent and fast delivery!",
+      "createdAt": "2026-08-31T10:41:07.456Z"
+    },
+    {
+      "id": "rev_generated_15",
+      "orderId": "ord_hist_15",
+      "orderNumber": "HK-20260903-000015",
+      "customerId": "usr_customer_2",
+      "customerName": "Rahul Sharma",
+      "foodRating": 5,
+      "deliveryRating": 5,
+      "overallRating": 5,
+      "comment": "Very neat and professional service.",
+      "createdAt": "2026-09-03T12:16:45.576Z"
+    },
+    {
+      "id": "rev_generated_18",
+      "orderId": "ord_hist_18",
+      "orderNumber": "HK-20260902-000018",
+      "customerId": "usr_customer_1",
+      "customerName": "Priya Sundaram",
+      "foodRating": 5,
+      "deliveryRating": 5,
+      "overallRating": 5,
+      "comment": "Excellent and fast delivery!",
+      "createdAt": "2026-09-02T13:43:51.110Z"
+    },
+    {
+      "id": "rev_generated_20",
+      "orderId": "ord_hist_20",
+      "orderNumber": "HK-20260831-000020",
+      "customerId": "usr_customer_4",
+      "customerName": "Karthik Raja",
+      "foodRating": 5,
+      "deliveryRating": 5,
+      "overallRating": 5,
+      "comment": "Amazing packaging, arrived super quick!",
+      "createdAt": "2026-08-31T08:50:03.277Z"
+    },
+    {
+      "id": "rev_generated_21",
+      "orderId": "ord_hist_21",
+      "orderNumber": "HK-20260905-000021",
+      "customerId": "usr_customer_1",
+      "customerName": "Priya Sundaram",
+      "foodRating": 5,
+      "deliveryRating": 5,
+      "overallRating": 5,
+      "comment": "Very neat and professional service.",
+      "createdAt": "2026-09-05T11:24:29.135Z"
+    },
+    {
+      "id": "rev_generated_24",
+      "orderId": "ord_hist_24",
+      "orderNumber": "HK-20260908-000024",
+      "customerId": "usr_customer_4",
+      "customerName": "Karthik Raja",
+      "foodRating": 5,
+      "deliveryRating": 5,
+      "overallRating": 5,
+      "comment": "Excellent and fast delivery!",
+      "createdAt": "2026-09-08T10:19:02.531Z"
+    },
+    {
+      "id": "rev_generated_25",
+      "orderId": "ord_hist_25",
+      "orderNumber": "HK-20260907-000025",
+      "customerId": "usr_customer_1",
+      "customerName": "Priya Sundaram",
+      "foodRating": 5,
+      "deliveryRating": 5,
+      "overallRating": 5,
+      "comment": "Delivery partner was very polite and handled the food with care.",
+      "createdAt": "2026-09-07T11:13:15.299Z"
+    },
+    {
+      "id": "rev_generated_27",
+      "orderId": "ord_hist_27",
+      "orderNumber": "HK-20260903-000027",
+      "customerId": "usr_customer_4",
+      "customerName": "Karthik Raja",
+      "foodRating": 4,
+      "deliveryRating": 4,
+      "overallRating": 4,
+      "comment": "Very neat and professional service.",
+      "createdAt": "2026-09-03T10:14:32.393Z"
+    },
+    {
+      "id": "rev_generated_30",
+      "orderId": "ord_hist_30",
+      "orderNumber": "HK-20260910-000030",
+      "customerId": "usr_customer_2",
+      "customerName": "Rahul Sharma",
+      "foodRating": 4,
+      "deliveryRating": 4,
+      "overallRating": 4,
+      "comment": "Excellent and fast delivery!",
+      "createdAt": "2026-09-10T06:43:40.500Z"
+    },
+    {
+      "id": "rev_generated_33",
+      "orderId": "ord_hist_33",
+      "orderNumber": "HK-20260902-000033",
+      "customerId": "usr_customer_5",
+      "customerName": "Arun Kumar",
+      "foodRating": 5,
+      "deliveryRating": 5,
+      "overallRating": 5,
+      "comment": "Very neat and professional service.",
+      "createdAt": "2026-09-02T04:52:02.105Z"
+    },
+    {
+      "id": "rev_generated_35",
+      "orderId": "ord_hist_35",
+      "orderNumber": "HK-20260901-000035",
+      "customerId": "usr_customer_5",
+      "customerName": "Arun Kumar",
+      "foodRating": 5,
+      "deliveryRating": 5,
+      "overallRating": 5,
+      "comment": "Super fast delivery, extremely friendly executive!",
+      "createdAt": "2026-09-01T05:07:42.503Z"
+    }
+  ],
+  "notifications": [
+    {
+      "userId": "cust_test_1",
+      "userRole": "CUSTOMER",
+      "title": "Order Accepted!",
+      "message": "Order #HK-20260913-000105: Accepted by Manoj Kumar (STAFF)",
+      "type": "ORDER",
+      "orderId": "ord_1789314344720",
+      "id": "notif_1789564425596_45",
+      "isRead": false,
+      "createdAt": "2026-09-16T13:13:45.596Z"
+    },
+    {
+      "userId": "cust_test_1",
+      "userRole": "CUSTOMER",
+      "title": "Order Accepted!",
+      "message": "Order #HK-20260913-000106: Accepted by Manoj Kumar (STAFF)",
+      "type": "ORDER",
+      "orderId": "ord_1789314442911",
+      "id": "notif_1789564425404_19",
+      "isRead": false,
+      "createdAt": "2026-09-16T13:13:45.404Z"
+    },
+    {
+      "userId": "usr_1789555862053_500",
+      "userRole": "CUSTOMER",
+      "title": "Order Accepted!",
+      "message": "Order #HK-20260916-000115: Accepted by Manoj Kumar (STAFF)",
+      "type": "ORDER",
+      "orderId": "ord_1789557347404",
+      "id": "notif_1789564424589_46",
+      "isRead": false,
+      "createdAt": "2026-09-16T13:13:44.589Z"
+    },
+    {
+      "userId": "usr_1789555862053_500",
+      "userRole": "CUSTOMER",
+      "title": "Delivery Partner Assigned!",
+      "message": "Order #HK-20260916-000116: Assigned to Arun Kumar",
+      "type": "ORDER",
+      "orderId": "ord_1789560000138",
+      "id": "notif_1789560108759_4",
+      "isRead": false,
+      "createdAt": "2026-09-16T12:01:48.759Z"
+    },
+    {
+      "userId": "usr_delivery_1",
+      "userRole": "DELIVERY_PARTNER",
+      "title": "New Delivery Assigned!",
+      "message": "Order #HK-20260916-000116 assigned to you for delivery.",
+      "type": "ORDER",
+      "orderId": "ord_1789560000138",
+      "id": "notif_1789560108756_86",
+      "isRead": false,
+      "createdAt": "2026-09-16T12:01:48.756Z"
+    },
+    {
+      "userId": "usr_1789555862053_500",
+      "userRole": "CUSTOMER",
+      "title": "Food Ready!",
+      "message": "Order #HK-20260916-000116: Packaging completed & awaiting delivery assignment",
+      "type": "ORDER",
+      "orderId": "ord_1789560000138",
+      "id": "notif_1789560105818_66",
+      "isRead": false,
+      "createdAt": "2026-09-16T12:01:45.818Z"
+    },
+    {
+      "userId": "usr_1789555862053_500",
+      "userRole": "CUSTOMER",
+      "title": "Food Preparing!",
+      "message": "Order #HK-20260916-000116: Kitchen is actively preparing your dishes",
+      "type": "ORDER",
+      "orderId": "ord_1789560000138",
+      "id": "notif_1789560103785_10",
+      "isRead": false,
+      "createdAt": "2026-09-16T12:01:43.785Z"
+    },
+    {
+      "userId": "usr_1789555862053_500",
+      "userRole": "CUSTOMER",
+      "title": "Order Accepted!",
+      "message": "Order #HK-20260916-000116: Accepted by Chef Senthil (Owner) (OWNER)",
+      "type": "ORDER",
+      "orderId": "ord_1789560000138",
+      "id": "notif_1789560103124_53",
+      "isRead": false,
+      "createdAt": "2026-09-16T12:01:43.124Z"
+    },
+    {
+      "userId": "cust_test_1",
+      "userRole": "CUSTOMER",
+      "title": "Delivery Partner Assigned!",
+      "message": "Order #HK-20260916-000114: Assigned to Arun Kumar",
+      "type": "ORDER",
+      "orderId": "ord_1789553796921",
+      "id": "notif_1789553796939_66",
+      "isRead": false,
+      "createdAt": "2026-09-16T10:16:36.939Z"
+    },
+    {
+      "userId": "usr_delivery_1",
+      "userRole": "DELIVERY_PARTNER",
+      "title": "New Delivery Assigned!",
+      "message": "Order #HK-20260916-000114 assigned to you for delivery.",
+      "type": "ORDER",
+      "orderId": "ord_1789553796921",
+      "id": "notif_1789553796938_98",
+      "isRead": false,
+      "createdAt": "2026-09-16T10:16:36.938Z"
+    },
+    {
+      "userId": "cust_test_1",
+      "userRole": "CUSTOMER",
+      "title": "Food Ready!",
+      "message": "Order #HK-20260916-000114: Packaging completed & awaiting delivery assignment",
+      "type": "ORDER",
+      "orderId": "ord_1789553796921",
+      "id": "notif_1789553796933_1",
+      "isRead": false,
+      "createdAt": "2026-09-16T10:16:36.933Z"
+    },
+    {
+      "userId": "cust_test_1",
+      "userRole": "CUSTOMER",
+      "title": "Food Preparing!",
+      "message": "Order #HK-20260916-000114: Kitchen is actively preparing your dishes",
+      "type": "ORDER",
+      "orderId": "ord_1789553796921",
+      "id": "notif_1789553796929_26",
+      "isRead": false,
+      "createdAt": "2026-09-16T10:16:36.929Z"
+    },
+    {
+      "userId": "cust_test_1",
+      "userRole": "CUSTOMER",
+      "title": "Order Accepted!",
+      "message": "Order #HK-20260916-000114: Accepted by Chef Raj (STAFF)",
+      "type": "ORDER",
+      "orderId": "ord_1789553796921",
+      "id": "notif_1789553796925_18",
+      "isRead": false,
+      "createdAt": "2026-09-16T10:16:36.925Z"
+    },
+    {
+      "userId": "usr_owner_1",
+      "userRole": "OWNER",
+      "title": "New Order Received!",
+      "message": "Order #HK-20260916-000114 placed by Test Customer (₹434)",
+      "type": "ORDER",
+      "orderId": "ord_1789553796921",
+      "id": "notif_1789553796921_66",
+      "isRead": false,
+      "createdAt": "2026-09-16T10:16:36.921Z"
+    },
+    {
+      "userId": "cust_test_1",
+      "userRole": "CUSTOMER",
+      "title": "Delivery Partner Assigned!",
+      "message": "Order #HK-20260916-000113: Assigned to Arun Kumar",
+      "type": "ORDER",
+      "orderId": "ord_1789550822484",
+      "id": "notif_1789550822506_99",
+      "isRead": false,
+      "createdAt": "2026-09-16T09:27:02.506Z"
+    },
+    {
+      "userId": "usr_delivery_1",
+      "userRole": "DELIVERY_PARTNER",
+      "title": "New Delivery Assigned!",
+      "message": "Order #HK-20260916-000113 assigned to you for delivery.",
+      "type": "ORDER",
+      "orderId": "ord_1789550822484",
+      "id": "notif_1789550822504_72",
+      "isRead": false,
+      "createdAt": "2026-09-16T09:27:02.504Z"
+    },
+    {
+      "userId": "cust_test_1",
+      "userRole": "CUSTOMER",
+      "title": "Food Ready!",
+      "message": "Order #HK-20260916-000113: Packaging completed & awaiting delivery assignment",
+      "type": "ORDER",
+      "orderId": "ord_1789550822484",
+      "id": "notif_1789550822498_23",
+      "isRead": false,
+      "createdAt": "2026-09-16T09:27:02.498Z"
+    },
+    {
+      "userId": "cust_test_1",
+      "userRole": "CUSTOMER",
+      "title": "Food Preparing!",
+      "message": "Order #HK-20260916-000113: Kitchen is actively preparing your dishes",
+      "type": "ORDER",
+      "orderId": "ord_1789550822484",
+      "id": "notif_1789550822494_57",
+      "isRead": false,
+      "createdAt": "2026-09-16T09:27:02.494Z"
+    },
+    {
+      "userId": "cust_test_1",
+      "userRole": "CUSTOMER",
+      "title": "Order Accepted!",
+      "message": "Order #HK-20260916-000113: Accepted by Chef Raj (STAFF)",
+      "type": "ORDER",
+      "orderId": "ord_1789550822484",
+      "id": "notif_1789550822488_7",
+      "isRead": false,
+      "createdAt": "2026-09-16T09:27:02.488Z"
+    },
+    {
+      "userId": "usr_owner_1",
+      "userRole": "OWNER",
+      "title": "New Order Received!",
+      "message": "Order #HK-20260916-000113 placed by Test Customer (₹434)",
+      "type": "ORDER",
+      "orderId": "ord_1789550822484",
+      "id": "notif_1789550822484_19",
+      "isRead": false,
+      "createdAt": "2026-09-16T09:27:02.484Z"
+    },
+    {
+      "userId": "usr_customer_2",
+      "userRole": "CUSTOMER",
+      "title": "Delivery Partner Assigned!",
+      "message": "Order #HK-20260812-000102: Assigned to Arun Kumar",
+      "type": "ORDER",
+      "orderId": "ord_1002",
+      "id": "notif_1789549154240_34",
+      "isRead": false,
+      "createdAt": "2026-09-16T08:59:14.240Z"
+    },
+    {
+      "userId": "usr_delivery_1",
+      "userRole": "DELIVERY_PARTNER",
+      "title": "New Delivery Assigned!",
+      "message": "Order #HK-20260812-000102 assigned to you for delivery.",
+      "type": "ORDER",
+      "orderId": "ord_1002",
+      "id": "notif_1789549154238_35",
+      "isRead": false,
+      "createdAt": "2026-09-16T08:59:14.238Z"
+    },
+    {
+      "userId": "cust_test_1",
+      "userRole": "CUSTOMER",
+      "title": "Delivery Partner Assigned!",
+      "message": "Order #HK-20260913-000112: Assigned to Delivery Agent",
+      "type": "ORDER",
+      "orderId": "ord_1789316343046",
+      "id": "notif_1789316343090_10",
+      "isRead": false,
+      "createdAt": "2026-09-13T16:19:03.090Z"
+    },
+    {
+      "userId": "cust_test_1",
+      "userRole": "CUSTOMER",
+      "title": "Food Ready!",
+      "message": "Order #HK-20260913-000112: Packaging completed & awaiting delivery assignment",
+      "type": "ORDER",
+      "orderId": "ord_1789316343046",
+      "id": "notif_1789316343056_69",
+      "isRead": false,
+      "createdAt": "2026-09-13T16:19:03.056Z"
+    },
+    {
+      "userId": "cust_test_1",
+      "userRole": "CUSTOMER",
+      "title": "Food Preparing!",
+      "message": "Order #HK-20260913-000112: Kitchen is actively preparing your dishes",
+      "type": "ORDER",
+      "orderId": "ord_1789316343046",
+      "id": "notif_1789316343053_0",
+      "isRead": false,
+      "createdAt": "2026-09-13T16:19:03.053Z"
+    },
+    {
+      "userId": "cust_test_1",
+      "userRole": "CUSTOMER",
+      "title": "Order Accepted!",
+      "message": "Order #HK-20260913-000112: Accepted by Chef Raj (STAFF)",
+      "type": "ORDER",
+      "orderId": "ord_1789316343046",
+      "id": "notif_1789316343049_88",
+      "isRead": false,
+      "createdAt": "2026-09-13T16:19:03.049Z"
+    },
+    {
+      "userId": "usr_owner_1",
+      "userRole": "OWNER",
+      "title": "New Order Received!",
+      "message": "Order #HK-20260913-000112 placed by Test Customer (₹434)",
+      "type": "ORDER",
+      "orderId": "ord_1789316343046",
+      "id": "notif_1789316343046_28",
+      "isRead": false,
+      "createdAt": "2026-09-13T16:19:03.046Z"
+    },
+    {
+      "userId": "cust_test_1",
+      "userRole": "CUSTOMER",
+      "title": "Delivery Partner Assigned!",
+      "message": "Order #HK-20260913-000111: Assigned to Delivery Agent",
+      "type": "ORDER",
+      "orderId": "ord_1789316076929",
+      "id": "notif_1789316076943_94",
+      "isRead": false,
+      "createdAt": "2026-09-13T16:14:36.943Z"
+    },
+    {
+      "userId": "cust_test_1",
+      "userRole": "CUSTOMER",
+      "title": "Food Ready!",
+      "message": "Order #HK-20260913-000111: Packaging completed & awaiting delivery assignment",
+      "type": "ORDER",
+      "orderId": "ord_1789316076929",
+      "id": "notif_1789316076940_58",
+      "isRead": false,
+      "createdAt": "2026-09-13T16:14:36.940Z"
+    },
+    {
+      "userId": "cust_test_1",
+      "userRole": "CUSTOMER",
+      "title": "Food Preparing!",
+      "message": "Order #HK-20260913-000111: Kitchen is actively preparing your dishes",
+      "type": "ORDER",
+      "orderId": "ord_1789316076929",
+      "id": "notif_1789316076937_88",
+      "isRead": false,
+      "createdAt": "2026-09-13T16:14:36.937Z"
+    },
+    {
+      "userId": "cust_test_1",
+      "userRole": "CUSTOMER",
+      "title": "Order Accepted!",
+      "message": "Order #HK-20260913-000111: Accepted by Chef Raj (STAFF)",
+      "type": "ORDER",
+      "orderId": "ord_1789316076929",
+      "id": "notif_1789316076932_85",
+      "isRead": false,
+      "createdAt": "2026-09-13T16:14:36.932Z"
+    },
+    {
+      "userId": "usr_owner_1",
+      "userRole": "OWNER",
+      "title": "New Order Received!",
+      "message": "Order #HK-20260913-000111 placed by Test Customer (₹434)",
+      "type": "ORDER",
+      "orderId": "ord_1789316076929",
+      "id": "notif_1789316076929_57",
+      "isRead": false,
+      "createdAt": "2026-09-13T16:14:36.929Z"
+    },
+    {
+      "userId": "cust_test_1",
+      "userRole": "CUSTOMER",
+      "title": "Delivery Partner Assigned!",
+      "message": "Order #HK-20260913-000110: Assigned to Delivery Agent",
+      "type": "ORDER",
+      "orderId": "ord_1789314830835",
+      "id": "notif_1789314830848_50",
+      "isRead": false,
+      "createdAt": "2026-09-13T15:53:50.848Z"
+    },
+    {
+      "userId": "cust_test_1",
+      "userRole": "CUSTOMER",
+      "title": "Food Ready!",
+      "message": "Order #HK-20260913-000110: Packaging completed & awaiting delivery assignment",
+      "type": "ORDER",
+      "orderId": "ord_1789314830835",
+      "id": "notif_1789314830845_31",
+      "isRead": false,
+      "createdAt": "2026-09-13T15:53:50.845Z"
+    },
+    {
+      "userId": "cust_test_1",
+      "userRole": "CUSTOMER",
+      "title": "Food Preparing!",
+      "message": "Order #HK-20260913-000110: Kitchen is actively preparing your dishes",
+      "type": "ORDER",
+      "orderId": "ord_1789314830835",
+      "id": "notif_1789314830843_59",
+      "isRead": false,
+      "createdAt": "2026-09-13T15:53:50.843Z"
+    },
+    {
+      "userId": "cust_test_1",
+      "userRole": "CUSTOMER",
+      "title": "Order Accepted!",
+      "message": "Order #HK-20260913-000110: Accepted by Chef Raj (STAFF)",
+      "type": "ORDER",
+      "orderId": "ord_1789314830835",
+      "id": "notif_1789314830840_13",
+      "isRead": false,
+      "createdAt": "2026-09-13T15:53:50.840Z"
+    },
+    {
+      "userId": "usr_owner_1",
+      "userRole": "OWNER",
+      "title": "New Order Received!",
+      "message": "Order #HK-20260913-000110 placed by Test Customer (₹434)",
+      "type": "ORDER",
+      "orderId": "ord_1789314830835",
+      "id": "notif_1789314830835_44",
+      "isRead": false,
+      "createdAt": "2026-09-13T15:53:50.835Z"
+    },
+    {
+      "userId": "cust_test_1",
+      "userRole": "CUSTOMER",
+      "title": "Delivery Partner Assigned!",
+      "message": "Order #HK-20260913-000109: Assigned to Delivery Agent",
+      "type": "ORDER",
+      "orderId": "ord_1789314588725",
+      "id": "notif_1789314588737_12",
+      "isRead": false,
+      "createdAt": "2026-09-13T15:49:48.737Z"
+    },
+    {
+      "userId": "cust_test_1",
+      "userRole": "CUSTOMER",
+      "title": "Food Ready!",
+      "message": "Order #HK-20260913-000109: Packaging completed & awaiting delivery assignment",
+      "type": "ORDER",
+      "orderId": "ord_1789314588725",
+      "id": "notif_1789314588735_91",
+      "isRead": false,
+      "createdAt": "2026-09-13T15:49:48.735Z"
+    },
+    {
+      "userId": "cust_test_1",
+      "userRole": "CUSTOMER",
+      "title": "Food Preparing!",
+      "message": "Order #HK-20260913-000109: Kitchen is actively preparing your dishes",
+      "type": "ORDER",
+      "orderId": "ord_1789314588725",
+      "id": "notif_1789314588732_70",
+      "isRead": false,
+      "createdAt": "2026-09-13T15:49:48.732Z"
+    },
+    {
+      "userId": "cust_test_1",
+      "userRole": "CUSTOMER",
+      "title": "Order Accepted!",
+      "message": "Order #HK-20260913-000109: Accepted by Chef Raj (STAFF)",
+      "type": "ORDER",
+      "orderId": "ord_1789314588725",
+      "id": "notif_1789314588729_24",
+      "isRead": false,
+      "createdAt": "2026-09-13T15:49:48.729Z"
+    },
+    {
+      "userId": "usr_owner_1",
+      "userRole": "OWNER",
+      "title": "New Order Received!",
+      "message": "Order #HK-20260913-000109 placed by Test Customer (₹434)",
+      "type": "ORDER",
+      "orderId": "ord_1789314588725",
+      "id": "notif_1789314588725_45",
+      "isRead": false,
+      "createdAt": "2026-09-13T15:49:48.725Z"
+    },
+    {
+      "userId": "cust_test_1",
+      "userRole": "CUSTOMER",
+      "title": "Delivery Partner Assigned!",
+      "message": "Order #HK-20260913-000108: Assigned to Delivery Agent",
+      "type": "ORDER",
+      "orderId": "ord_1789314522319",
+      "id": "notif_1789314522335_80",
+      "isRead": false,
+      "createdAt": "2026-09-13T15:48:42.335Z"
+    },
+    {
+      "userId": "cust_test_1",
+      "userRole": "CUSTOMER",
+      "title": "Food Ready!",
+      "message": "Order #HK-20260913-000108: Packaging completed & awaiting delivery assignment",
+      "type": "ORDER",
+      "orderId": "ord_1789314522319",
+      "id": "notif_1789314522331_7",
+      "isRead": false,
+      "createdAt": "2026-09-13T15:48:42.331Z"
+    },
+    {
+      "userId": "cust_test_1",
+      "userRole": "CUSTOMER",
+      "title": "Food Preparing!",
+      "message": "Order #HK-20260913-000108: Kitchen is actively preparing your dishes",
+      "type": "ORDER",
+      "orderId": "ord_1789314522319",
+      "id": "notif_1789314522327_54",
+      "isRead": false,
+      "createdAt": "2026-09-13T15:48:42.327Z"
+    },
+    {
+      "userId": "cust_test_1",
+      "userRole": "CUSTOMER",
+      "title": "Order Accepted!",
+      "message": "Order #HK-20260913-000108: Accepted by Chef Raj (KITCHEN_STAFF)",
+      "type": "ORDER",
+      "orderId": "ord_1789314522319",
+      "id": "notif_1789314522323_80",
+      "isRead": false,
+      "createdAt": "2026-09-13T15:48:42.323Z"
+    },
+    {
+      "userId": "usr_owner_1",
+      "userRole": "OWNER",
+      "title": "New Order Received!",
+      "message": "Order #HK-20260913-000108 placed by Test Customer (₹434)",
+      "type": "ORDER",
+      "orderId": "ord_1789314522319",
+      "id": "notif_1789314522319_36",
+      "isRead": false,
+      "createdAt": "2026-09-13T15:48:42.319Z"
+    },
+    {
+      "userId": "cust_test_1",
+      "userRole": "CUSTOMER",
+      "title": "Delivery Partner Assigned!",
+      "message": "Order #HK-20260913-000107: Assigned to Delivery Agent",
+      "type": "ORDER",
+      "orderId": "ord_1789314486847",
+      "id": "notif_1789314486857_2",
+      "isRead": false,
+      "createdAt": "2026-09-13T15:48:06.857Z"
+    },
+    {
+      "userId": "cust_test_1",
+      "userRole": "CUSTOMER",
+      "title": "Food Ready!",
+      "message": "Order #HK-20260913-000107: Packaging completed & awaiting delivery assignment",
+      "type": "ORDER",
+      "orderId": "ord_1789314486847",
+      "id": "notif_1789314486855_84",
+      "isRead": false,
+      "createdAt": "2026-09-13T15:48:06.855Z"
+    },
+    {
+      "userId": "cust_test_1",
+      "userRole": "CUSTOMER",
+      "title": "Food Preparing!",
+      "message": "Order #HK-20260913-000107: Kitchen is actively preparing your dishes",
+      "type": "ORDER",
+      "orderId": "ord_1789314486847",
+      "id": "notif_1789314486852_67",
+      "isRead": false,
+      "createdAt": "2026-09-13T15:48:06.852Z"
+    },
+    {
+      "userId": "cust_test_1",
+      "userRole": "CUSTOMER",
+      "title": "Order Accepted!",
+      "message": "Order #HK-20260913-000107: Accepted by Chef Raj (KITCHEN_STAFF)",
+      "type": "ORDER",
+      "orderId": "ord_1789314486847",
+      "id": "notif_1789314486850_24",
+      "isRead": false,
+      "createdAt": "2026-09-13T15:48:06.850Z"
+    },
+    {
+      "userId": "usr_owner_1",
+      "userRole": "OWNER",
+      "title": "New Order Received!",
+      "message": "Order #HK-20260913-000107 placed by Test Customer (₹434)",
+      "type": "ORDER",
+      "orderId": "ord_1789314486847",
+      "id": "notif_1789314486847_92",
+      "isRead": false,
+      "createdAt": "2026-09-13T15:48:06.847Z"
+    },
+    {
+      "userId": "usr_owner_1",
+      "userRole": "OWNER",
+      "title": "New Order Received!",
+      "message": "Order #HK-20260913-000106 placed by Test Customer (₹434)",
+      "type": "ORDER",
+      "orderId": "ord_1789314442911",
+      "id": "notif_1789314442911_82",
+      "isRead": false,
+      "createdAt": "2026-09-13T15:47:22.911Z"
+    },
+    {
+      "userId": "usr_owner_1",
+      "userRole": "OWNER",
+      "title": "New Order Received!",
+      "message": "Order #HK-20260913-000105 placed by Test Customer (₹434)",
+      "type": "ORDER",
+      "orderId": "ord_1789314344720",
+      "id": "notif_1789314344720_29",
+      "isRead": false,
+      "createdAt": "2026-09-13T15:45:44.720Z"
+    },
+    {
+      "userId": "usr_customer_1",
+      "userRole": "CUSTOMER",
+      "title": "Food Preparing!",
+      "message": "Order #HK-20260913-000104: Kitchen is actively preparing your dishes",
+      "type": "ORDER",
+      "orderId": "ord_1789313953772",
+      "id": "notif_1789313963745_1",
+      "isRead": false,
+      "createdAt": "2026-09-13T15:39:23.745Z"
+    },
+    {
+      "userId": "usr_customer_1",
+      "userRole": "CUSTOMER",
+      "title": "Order Accepted!",
+      "message": "Order #HK-20260913-000104: Accepted by Priya Sundaram (CUSTOMER)",
+      "type": "ORDER",
+      "orderId": "ord_1789313953772",
+      "id": "notif_1789313959648_79",
+      "isRead": false,
+      "createdAt": "2026-09-13T15:39:19.648Z"
+    },
+    {
+      "userId": "usr_owner_1",
+      "userRole": "OWNER",
+      "title": "New Order Received!",
+      "message": "Order #HK-20260913-000104 placed by Priya Sundaram (₹266)",
+      "type": "ORDER",
+      "orderId": "ord_1789313953772",
+      "id": "notif_1789313953772_14",
+      "isRead": false,
+      "createdAt": "2026-09-13T15:39:13.772Z"
+    },
+    {
+      "userId": "usr_customer_1",
+      "userRole": "CUSTOMER",
+      "title": "Order Accepted!",
+      "message": "Order #HK-20260913-000103: Accepted by Priya Sundaram (CUSTOMER)",
+      "type": "ORDER",
+      "orderId": "ord_1789313245958",
+      "id": "notif_1789313897067_3",
+      "isRead": false,
+      "createdAt": "2026-09-13T15:38:17.067Z"
+    },
+    {
+      "userId": "usr_owner_1",
+      "userRole": "OWNER",
+      "title": "New Order Received!",
+      "message": "Order #HK-20260913-000103 placed by Sanjay M (₹266)",
+      "type": "ORDER",
+      "orderId": "ord_1789313245958",
+      "id": "notif_1789313245958_17",
+      "isRead": false,
+      "createdAt": "2026-09-13T15:27:25.958Z"
+    }
+  ],
+  "addresses": {
+    "usr_customer_1": [
+      {
+        "id": "addr_1",
+        "type": "HOME",
+        "name": "Priya Sundaram",
+        "phone": "+91 99887 76655",
+        "doorNo": "42-B",
+        "street": "Greenways Road, Sector 3",
+        "area": "Race Course",
+        "city": "Coimbatore",
+        "pincode": "641018",
+        "landmark": "Opp. Race Course Park Gate 2",
+        "instructions": "Please call before delivery and leave at door",
+        "coordinates": "11.0045, 76.9612",
+        "isDefault": true
+      },
+      {
+        "id": "addr_2",
+        "type": "WORK",
+        "name": "Priya Sundaram (Office)",
+        "phone": "+91 99887 76655",
+        "doorNo": "3rd Floor, Tech Park",
+        "street": "Avinashi Road",
+        "area": "Peelamedu",
+        "city": "Coimbatore",
+        "pincode": "641004",
+        "landmark": "Near TIDEL Park",
+        "coordinates": "11.0281, 77.0024",
+        "isDefault": false
+      }
+    ]
+  },
+  "authCredentials": {
+    "usr_owner_1": {
+      "userId": "usr_owner_1",
+      "email": "owner@hunterskitchen.com",
+      "passwordHash": "$2b$10$5P2mS8zmQ6OTJB14DYum8.tBqAiXeCqWE3UT8.dfNfQ5uDoImlT2u",
+      "failedLoginAttempts": 0
+    },
+    "usr_staff_1": {
+      "userId": "usr_staff_1",
+      "email": "staff1@hunterskitchen.com",
+      "passwordHash": "$2b$10$FQcD0nxqAdeUDG8epb24cutG.4F8EtY0w3ifyo3wBEBV2b72B68IG",
+      "failedLoginAttempts": 0
+    },
+    "usr_staff_2": {
+      "userId": "usr_staff_2",
+      "email": "staff2@hunterskitchen.com",
+      "passwordHash": "$2b$10$eAxUTRboFjOML.p2CuisN.C2lv46EmkhX83T/gD4D65J3C7rm6SIu"
+    },
+    "usr_delivery_1": {
+      "userId": "usr_delivery_1",
+      "email": "delivery1@hunterskitchen.com",
+      "passwordHash": "$2b$10$eAxUTRboFjOML.p2CuisN.C2lv46EmkhX83T/gD4D65J3C7rm6SIu"
+    },
+    "usr_delivery_2": {
+      "userId": "usr_delivery_2",
+      "email": "delivery2@hunterskitchen.com",
+      "passwordHash": "$2b$10$eAxUTRboFjOML.p2CuisN.C2lv46EmkhX83T/gD4D65J3C7rm6SIu"
+    },
+    "usr_delivery_3": {
+      "userId": "usr_delivery_3",
+      "email": "delivery3@hunterskitchen.com",
+      "passwordHash": "$2b$10$eAxUTRboFjOML.p2CuisN.C2lv46EmkhX83T/gD4D65J3C7rm6SIu"
+    },
+    "usr_delivery_4": {
+      "userId": "usr_delivery_4",
+      "email": "delivery4@hunterskitchen.com",
+      "passwordHash": "$2b$10$eAxUTRboFjOML.p2CuisN.C2lv46EmkhX83T/gD4D65J3C7rm6SIu"
+    },
+    "usr_customer_1": {
+      "userId": "usr_customer_1",
+      "email": "customer1@hunterskitchen.com",
+      "passwordHash": "$2b$10$1X3IC1NO7nMKZaH.plOGzO3xXoQmzCjledHqVhpI.luovhv4rn1p6",
+      "failedLoginAttempts": 0
+    },
+    "usr_customer_2": {
+      "userId": "usr_customer_2",
+      "email": "customer2@hunterskitchen.com",
+      "passwordHash": "$2b$10$eAxUTRboFjOML.p2CuisN.C2lv46EmkhX83T/gD4D65J3C7rm6SIu"
+    },
+    "usr_staff_3": {
+      "userId": "usr_staff_3",
+      "email": "chef@hunterskitchen.com",
+      "passwordHash": "$2b$10$eAxUTRboFjOML.p2CuisN.C2lv46EmkhX83T/gD4D65J3C7rm6SIu",
+      "failedLoginAttempts": 0
+    },
+    "usr_staff_4": {
+      "userId": "usr_staff_4",
+      "email": "cook@hunterskitchen.com",
+      "passwordHash": "$2b$10$eAxUTRboFjOML.p2CuisN.C2lv46EmkhX83T/gD4D65J3C7rm6SIu"
+    },
+    "usr_staff_invited": {
+      "userId": "usr_staff_invited",
+      "email": "invited@hunterskitchen.com",
+      "passwordHash": "$2b$10$eAxUTRboFjOML.p2CuisN.C2lv46EmkhX83T/gD4D65J3C7rm6SIu",
+      "inviteToken": "invite_chef_token_123",
+      "inviteExpires": 1789920876916
+    },
+    "usr_suspended_1": {
+      "userId": "usr_suspended_1",
+      "email": "suspended@hunterskitchen.com",
+      "passwordHash": "$2b$10$eAxUTRboFjOML.p2CuisN.C2lv46EmkhX83T/gD4D65J3C7rm6SIu"
+    }
+  }
+}
