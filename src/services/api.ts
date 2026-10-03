@@ -13,15 +13,34 @@ import {
 
 const API_BASE = '/api';
 
+// Clean up any legacy tokens stored in browser storage from previous versions
+if (typeof window !== 'undefined') {
+  try {
+    sessionStorage.removeItem('hk_auth_token');
+    localStorage.removeItem('hk_auth_token');
+  } catch {
+    // Ignore storage restrictions (e.g. private browsing mode)
+  }
+}
+
+// In-Memory Token Reference (Kept strictly in JS runtime memory, never written to disk/localStorage)
+let inMemoryAuthToken: string | null = null;
+
+export function setAuthToken(token: string | null) {
+  inMemoryAuthToken = token;
+}
+
+export function getAuthToken(): string | null {
+  return inMemoryAuthToken;
+}
+
 export async function fetchApi<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const token =
-    typeof window !== 'undefined'
-      ? sessionStorage.getItem('hk_auth_token') || localStorage.getItem('hk_auth_token')
-      : null;
+  // Use in-memory token if active in the current tab session
+  const token = inMemoryAuthToken;
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    'X-Requested-With': 'XMLHttpRequest',
+    'X-Requested-With': 'XMLHttpRequest', // Anti-CSRF verification header
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...((options.headers as Record<string, string>) || {})
   };
@@ -29,7 +48,7 @@ export async function fetchApi<T>(endpoint: string, options: RequestInit = {}): 
   let response: Response;
   try {
     response = await fetch(`${API_BASE}${endpoint}`, {
-      credentials: 'include',
+      credentials: 'include', // Automatically attaches HttpOnly cookies (hk_session)
       ...options,
       headers
     });
@@ -42,9 +61,13 @@ export async function fetchApi<T>(endpoint: string, options: RequestInit = {}): 
     json = await response.json();
   } catch (err) {
     if (!response.ok) {
-      if (response.status === 401 && typeof window !== 'undefined') {
-        sessionStorage.removeItem('hk_auth_token');
-        localStorage.removeItem('hk_auth_token');
+      const isAuthEndpoint = endpoint.startsWith('/auth/');
+      if (response.status === 401 && !isAuthEndpoint && typeof window !== 'undefined') {
+        inMemoryAuthToken = null;
+        try {
+          sessionStorage.removeItem('hk_auth_token');
+          localStorage.removeItem('hk_auth_token');
+        } catch {}
         window.dispatchEvent(new CustomEvent('hk:unauthorized'));
       }
       throw new Error(`API Request failed with status ${response.status}`);
@@ -52,9 +75,13 @@ export async function fetchApi<T>(endpoint: string, options: RequestInit = {}): 
   }
 
   if (!response.ok || json.success === false) {
-    if (response.status === 401 && typeof window !== 'undefined') {
-      sessionStorage.removeItem('hk_auth_token');
-      localStorage.removeItem('hk_auth_token');
+    const isAuthEndpoint = endpoint.startsWith('/auth/');
+    if (response.status === 401 && !isAuthEndpoint && typeof window !== 'undefined') {
+      inMemoryAuthToken = null;
+      try {
+        sessionStorage.removeItem('hk_auth_token');
+        localStorage.removeItem('hk_auth_token');
+      } catch {}
       window.dispatchEvent(new CustomEvent('hk:unauthorized'));
     }
     throw new Error(json.message || json.error?.message || `Request to ${endpoint} failed (${response.status})`);
@@ -80,24 +107,22 @@ export const apiService = {
     password: string;
     address?: Partial<Address>;
   }) => {
-    const res = await fetchApi<{ user: User; token: string; expiresAt: string }>('/auth/register', {
+    const res = await fetchApi<{ user: User; token?: string; expiresAt: string }>('/auth/register', {
       method: 'POST',
       body: JSON.stringify(payload)
     });
-    if (res?.token && typeof window !== 'undefined') {
-      sessionStorage.setItem('hk_auth_token', res.token);
-      localStorage.setItem('hk_auth_token', res.token);
+    if (res?.token) {
+      inMemoryAuthToken = res.token;
     }
     return res;
   },
   login: async (email: string, password: string) => {
-    const res = await fetchApi<{ user: User; token: string; expiresAt: string }>('/auth/login', {
+    const res = await fetchApi<{ user: User; token?: string; expiresAt: string }>('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password })
     });
-    if (res?.token && typeof window !== 'undefined') {
-      sessionStorage.setItem('hk_auth_token', res.token);
-      localStorage.setItem('hk_auth_token', res.token);
+    if (res?.token) {
+      inMemoryAuthToken = res.token;
     }
     return res;
   },
@@ -110,9 +135,12 @@ export const apiService = {
     } catch {
       return { message: 'Logged out successfully' };
     } finally {
+      inMemoryAuthToken = null;
       if (typeof window !== 'undefined') {
-        sessionStorage.removeItem('hk_auth_token');
-        localStorage.removeItem('hk_auth_token');
+        try {
+          sessionStorage.removeItem('hk_auth_token');
+          localStorage.removeItem('hk_auth_token');
+        } catch {}
       }
     }
   },
@@ -131,9 +159,8 @@ export const apiService = {
       method: 'POST',
       body: JSON.stringify({ token, password })
     });
-    if (res?.token && typeof window !== 'undefined') {
-      sessionStorage.setItem('hk_auth_token', res.token);
-      localStorage.setItem('hk_auth_token', res.token);
+    if (res?.token) {
+      inMemoryAuthToken = res.token;
     }
     return res;
   },
@@ -151,13 +178,12 @@ export const apiService = {
       body: JSON.stringify({ email, purpose })
     }),
   loginWithOtp: async (email: string, otp: string) => {
-    const res = await fetchApi<{ user: User; token: string; expiresAt: string }>('/auth/otp/login', {
+    const res = await fetchApi<{ user: User; token?: string; expiresAt: string }>('/auth/otp/login', {
       method: 'POST',
       body: JSON.stringify({ email, otp })
     });
-    if (res?.token && typeof window !== 'undefined') {
-      sessionStorage.setItem('hk_auth_token', res.token);
-      localStorage.setItem('hk_auth_token', res.token);
+    if (res?.token) {
+      inMemoryAuthToken = res.token;
     }
     return res;
   },
@@ -188,9 +214,8 @@ export const apiService = {
       method: 'PATCH',
       body: JSON.stringify(data)
     });
-    if (res?.token && typeof window !== 'undefined') {
-      sessionStorage.setItem('hk_auth_token', res.token);
-      localStorage.setItem('hk_auth_token', res.token);
+    if (res?.token) {
+      inMemoryAuthToken = res.token;
     }
     return res;
   },
@@ -221,6 +246,14 @@ export const apiService = {
     }),
   deleteUser: (id: string) =>
     fetchApi<void>(`/owner/users/${id}`, {
+      method: 'DELETE'
+    }),
+  deleteStaff: (id: string) =>
+    fetchApi<void>(`/owner/staff/${id}`, {
+      method: 'DELETE'
+    }),
+  deleteDeliveryPartner: (id: string) =>
+    fetchApi<void>(`/owner/delivery-partners/${id}`, {
       method: 'DELETE'
     }),
 
@@ -425,6 +458,13 @@ export const apiService = {
 
   // Production Architecture & Hardening Observability
   getAuditLogs: (limit: number = 50) => fetchApi<any[]>(`/owner/audit-logs?limit=${limit}`),
+  getStaffActions: (params?: { date?: string; role?: string; limit?: number }) => {
+    const q = new URLSearchParams();
+    if (params?.date) q.set('date', params.date);
+    if (params?.role) q.set('role', params.role);
+    if (params?.limit) q.set('limit', String(params.limit));
+    return fetchApi<any>(`/owner/staff-actions${q.toString() ? `?${q.toString()}` : ''}`);
+  },
   verifyAuditIntegrity: () => fetchApi<{ isValid: boolean; checkedCount: number; genesisHash: string; latestHash: string; brokenAt?: number; error?: string }>('/owner/audit-logs/verify'),
   getOutboxEvents: (limit: number = 30) => fetchApi<any[]>(`/owner/outbox?limit=${limit}`),
   runReconciliation: () => fetchApi<{ timestamp: string; totalOrdersAudited: number; anomaliesDetected: number; issues: any[] }>('/owner/reconciliation')

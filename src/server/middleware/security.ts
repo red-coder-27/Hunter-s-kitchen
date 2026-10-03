@@ -10,6 +10,7 @@ interface RateLimitBucket {
 
 const generalRateLimitStore = new Map<string, RateLimitBucket>();
 const authRateLimitStore = new Map<string, RateLimitBucket>();
+const otpRateLimitStore = new Map<string, RateLimitBucket>();
 const orderRateLimitStore = new Map<string, RateLimitBucket>();
 const activeSSEConnections = new Map<string, number>();
 
@@ -21,6 +22,9 @@ setInterval(() => {
   }
   for (const [key, bucket] of authRateLimitStore.entries()) {
     if (now > bucket.resetTime) authRateLimitStore.delete(key);
+  }
+  for (const [key, bucket] of otpRateLimitStore.entries()) {
+    if (now > bucket.resetTime) otpRateLimitStore.delete(key);
   }
   for (const [key, bucket] of orderRateLimitStore.entries()) {
     if (now > bucket.resetTime) orderRateLimitStore.delete(key);
@@ -56,17 +60,65 @@ export function securityHeadersMiddleware(req: Request, res: Response, next: Nex
  * - General APIs: 300 req/min (high throughput for menu, categories, browsing)
  */
 export function rateLimiterMiddleware(req: Request, res: Response, next: NextFunction) {
-  // Skip rate limiting for static assets or health checks
-  if (req.path.startsWith('/assets') || req.path === '/api/health' || req.path === '/api/events/stream') {
+  // Rate limiting strictly applies to API routes only; bypass for all static/Vite/frontend module assets
+  if (
+    !req.path.startsWith('/api') ||
+    req.path.startsWith('/assets') ||
+    req.path.startsWith('/src') ||
+    req.path.startsWith('/@') ||
+    req.path === '/api/health' ||
+    req.path === '/api/events/stream'
+  ) {
     return next();
   }
 
   const clientIp = (req.headers['x-forwarded-for'] as string)?.split(',')[0]?.trim() || req.ip || '127.0.0.1';
   const now = Date.now();
 
-  // Tier 1: Authentication Endpoints (/api/auth/login, /api/auth/register, etc.)
-  if (req.path.startsWith('/api/auth/login') || req.path.startsWith('/api/auth/register')) {
-    const authLimit = 15;
+  // Tier 1a: Real-Time OTP Dispatch Rate Limiting (POST /api/auth/otp/send)
+  if (req.path === '/api/auth/otp/send' && req.method === 'POST') {
+    const otpLimit = 5;
+    const otpWindowMs = 10 * 60 * 1000; // 5 OTPs per 10 mins per IP
+    const key = `otp_${clientIp}`;
+    const bucket = otpRateLimitStore.get(key);
+
+    if (!bucket || now > bucket.resetTime) {
+      otpRateLimitStore.set(key, { count: 1, resetTime: now + otpWindowMs });
+      res.setHeader('X-RateLimit-Limit', otpLimit);
+      res.setHeader('X-RateLimit-Remaining', otpLimit - 1);
+    } else {
+      bucket.count++;
+      const remaining = Math.max(0, otpLimit - bucket.count);
+      res.setHeader('X-RateLimit-Limit', otpLimit);
+      res.setHeader('X-RateLimit-Remaining', remaining);
+
+      if (bucket.count > otpLimit) {
+        const retryAfterSec = Math.ceil((bucket.resetTime - now) / 1000);
+        res.setHeader('Retry-After', retryAfterSec);
+        logger.warn(`OTP send rate limit exceeded for IP: ${clientIp}`, { requestId: req.requestId, path: req.path });
+        return res.status(429).json({
+          success: false,
+          error: {
+            code: 'OTP_RATE_LIMIT_EXCEEDED',
+            message: `Too many OTP requests from this network. Please wait ${Math.ceil(retryAfterSec / 60)} minute(s) before requesting a new code.`
+          },
+          requestId: req.requestId,
+          timestamp: new Date().toISOString()
+        });
+      }
+    }
+  }
+
+  // Tier 1b: All Authentication & Credential Endpoints
+  if (
+    req.path.startsWith('/api/auth/login') ||
+    req.path.startsWith('/api/auth/register') ||
+    req.path.startsWith('/api/auth/otp') ||
+    req.path.startsWith('/api/auth/forgot-password') ||
+    req.path.startsWith('/api/auth/reset-password')
+  ) {
+    const isLocalhost = clientIp === '127.0.0.1' || clientIp === '::1' || clientIp === '::ffff:127.0.0.1';
+    const authLimit = isLocalhost ? 500 : 25;
     const authWindowMs = 15 * 60 * 1000; // 15 mins
     const key = `auth_${clientIp}`;
     const bucket = authRateLimitStore.get(key);

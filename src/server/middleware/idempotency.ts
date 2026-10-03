@@ -2,7 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { idempotencyService } from '../services/idempotencyService';
 import { logger } from '../utils/logger';
 
-export function idempotencyMiddleware(req: Request, res: Response, next: NextFunction) {
+export async function idempotencyMiddleware(req: Request, res: Response, next: NextFunction) {
   const idempotencyKey = req.headers['idempotency-key'] as string;
 
   // Only apply to mutating requests (POST, PUT, PATCH, DELETE) with an Idempotency-Key
@@ -11,7 +11,7 @@ export function idempotencyMiddleware(req: Request, res: Response, next: NextFun
   }
 
   try {
-    const { cached, record } = idempotencyService.startRequest(idempotencyKey, req.path, req.body);
+    const { cached, record } = await idempotencyService.startRequest(idempotencyKey, req.path, req.body);
 
     if (cached && record) {
       logger.info(`Idempotent request replayed for key: ${idempotencyKey}`, {

@@ -25,24 +25,32 @@ export const OwnerAnalyticsView: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'DISHES' | 'REVIEWS'>('OVERVIEW');
   const [selectedPoint, setSelectedPoint] = useState<{ day: string; revenue: number } | null>(null);
 
-  const loadAnalytics = async () => {
-    setIsLoading(true);
+  const loadAnalytics = async (isSilent = false) => {
+    if (!isSilent) setIsLoading(true);
     try {
       const data = await apiService.getAnalytics();
       setAnalytics(data);
       // Set default selected point for the chart
       if (data && data.revenueByDay && data.revenueByDay.length > 0) {
-        setSelectedPoint(data.revenueByDay[data.revenueByDay.length - 1]);
+        setSelectedPoint((prev) => {
+          if (!prev) return data.revenueByDay[data.revenueByDay.length - 1];
+          const matched = data.revenueByDay.find((d) => d.day === prev.day);
+          return matched || data.revenueByDay[data.revenueByDay.length - 1];
+        });
       }
     } catch (err) {
-      console.error(err);
+      console.error('Failed to load analytics:', err);
     } finally {
-      setIsLoading(false);
+      if (!isSilent) setIsLoading(false);
     }
   };
 
   useEffect(() => {
     loadAnalytics();
+    const interval = setInterval(() => {
+      loadAnalytics(true);
+    }, 4000);
+    return () => clearInterval(interval);
   }, []);
 
   if (isLoading || !analytics) {
@@ -71,16 +79,22 @@ export const OwnerAnalyticsView: React.FC = () => {
       {/* Premium Header */}
       <div className="flex items-center justify-between">
         <div>
-          <span className="text-[10px] font-bold text-red-600 uppercase tracking-widest bg-red-50 border border-red-100 px-2.5 py-1 rounded-full">
-            Owner Command Center
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-bold text-red-600 uppercase tracking-widest bg-red-50 border border-red-100 px-2.5 py-1 rounded-full">
+              Owner Command Center
+            </span>
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              Live Real-Time
+            </span>
+          </div>
           <h2 className="text-xl font-black text-stone-900 mt-1.5">Business Intelligence</h2>
           <p className="text-[11px] text-stone-500">Live operational insights & food-chain diagnostics</p>
         </div>
 
         <button
-          onClick={loadAnalytics}
-          className="p-2.5 rounded-xl bg-white border border-stone-200 hover:bg-stone-50 text-stone-700 shadow-3xs transition-all active:scale-95"
+          onClick={() => loadAnalytics(false)}
+          className="p-2.5 rounded-xl bg-white border border-stone-200 hover:bg-stone-50 text-stone-700 shadow-3xs transition-all active:scale-95 cursor-pointer"
           title="Refresh Analytics"
         >
           <RefreshCw className="w-4 h-4 text-stone-600" />
@@ -144,13 +158,13 @@ export const OwnerAnalyticsView: React.FC = () => {
               </div>
               <p className="text-[10px] font-extrabold text-stone-400 uppercase tracking-wider">Avg Kitchen Prep Time</p>
               <p className="text-2xl font-black text-stone-900 mt-1">
-                {analytics.avgPrepTimeMinutes || 18} <span className="text-xs font-bold text-stone-500">mins</span>
+                {analytics.avgPrepTimeMinutes > 0 ? analytics.avgPrepTimeMinutes : '0'} <span className="text-xs font-bold text-stone-500">mins</span>
               </p>
               <div className="flex items-center gap-1.5 mt-2 text-[10px] text-stone-500 font-medium">
                 <span className="bg-emerald-50 text-emerald-700 px-1.5 py-0.5 rounded font-bold border border-emerald-100">
-                  Target: &lt;20m
+                  {analytics.avgPrepTimeMinutes > 0 ? 'Target: <20m' : 'Standby'}
                 </span>
-                <span>Highly efficient</span>
+                <span>{analytics.avgPrepTimeMinutes > 0 ? 'Highly efficient' : 'Awaiting live orders'}</span>
               </div>
             </div>
 
@@ -291,17 +305,17 @@ export const OwnerAnalyticsView: React.FC = () => {
           )}
 
           {/* Category Sales Distribution */}
-          {analytics.topCategorySales && analytics.topCategorySales.length > 0 && (
-            <div className="bg-white rounded-2xl border border-stone-200 p-4 shadow-3xs space-y-3.5">
-              <div>
-                <h3 className="font-extrabold text-stone-900 text-xs uppercase tracking-wide flex items-center gap-1.5">
-                  <PieChart className="w-4 h-4 text-stone-600" /> Revenue Split by Food Category
-                </h3>
-                <p className="text-[10px] text-stone-400">Strategic classification of income streams</p>
-              </div>
+          <div className="bg-white rounded-2xl border border-stone-200 p-4 shadow-3xs space-y-3.5">
+            <div>
+              <h3 className="font-extrabold text-stone-900 text-xs uppercase tracking-wide flex items-center gap-1.5">
+                <PieChart className="w-4 h-4 text-stone-600" /> Revenue Split by Food Category
+              </h3>
+              <p className="text-[10px] text-stone-400">Strategic classification of income streams</p>
+            </div>
 
+            {analytics.topCategorySales && analytics.topCategorySales.length > 0 ? (
               <div className="space-y-3">
-                {(analytics.topCategorySales || []).map((cat) => (
+                {analytics.topCategorySales.map((cat) => (
                   <div key={cat.category} className="space-y-1">
                     <div className="flex justify-between items-center text-xs">
                       <span className="font-bold text-stone-700">{cat.category}</span>
@@ -319,21 +333,26 @@ export const OwnerAnalyticsView: React.FC = () => {
                   </div>
                 ))}
               </div>
-            </div>
-          )}
+            ) : (
+              <div className="py-6 text-center text-stone-400 text-xs">
+                <p className="font-semibold text-stone-500">No Category Sales Recorded</p>
+                <p className="text-[10px] text-stone-400 mt-0.5">Real-time revenue share will chart here once customer orders arrive.</p>
+              </div>
+            )}
+          </div>
 
           {/* Orders Funnel Matrix */}
-          {analytics.ordersByStatus && analytics.ordersByStatus.length > 0 && (
-            <div className="bg-white rounded-2xl border border-stone-200 p-4 shadow-3xs space-y-3.5">
-              <div>
-                <h3 className="font-extrabold text-stone-900 text-xs uppercase tracking-wide flex items-center gap-1.5">
-                  <Layers className="w-4 h-4 text-stone-600" /> Live Orders Workflow Funnel
-                </h3>
-                <p className="text-[10px] text-stone-400">Total volume distribution grouped by preparation stages</p>
-              </div>
+          <div className="bg-white rounded-2xl border border-stone-200 p-4 shadow-3xs space-y-3.5">
+            <div>
+              <h3 className="font-extrabold text-stone-900 text-xs uppercase tracking-wide flex items-center gap-1.5">
+                <Layers className="w-4 h-4 text-stone-600" /> Live Orders Workflow Funnel
+              </h3>
+              <p className="text-[10px] text-stone-400">Total volume distribution grouped by preparation stages</p>
+            </div>
 
+            {analytics.ordersByStatus && analytics.ordersByStatus.length > 0 ? (
               <div className="grid grid-cols-2 gap-3">
-                {(analytics.ordersByStatus || []).map((st) => (
+                {analytics.ordersByStatus.map((st) => (
                   <div key={st.status} className="p-3 bg-stone-50 border border-stone-200/60 rounded-xl space-y-1">
                     <div className="flex justify-between items-center">
                       <span className="text-[10px] font-black uppercase tracking-wider text-stone-500">
@@ -355,8 +374,13 @@ export const OwnerAnalyticsView: React.FC = () => {
                   </div>
                 ))}
               </div>
-            </div>
-          )}
+            ) : (
+              <div className="py-6 text-center text-stone-400 text-xs">
+                <p className="font-semibold text-stone-500">No Active Order Stages</p>
+                <p className="text-[10px] text-stone-400 mt-0.5">Workflow stages will track here in real-time as orders progress.</p>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -392,24 +416,32 @@ export const OwnerAnalyticsView: React.FC = () => {
               </div>
             </div>
 
-            <div className="divide-y divide-stone-100">
-              {sortedItemSales.map((item, idx) => (
-                <div key={item.menuItemId} className="py-3 flex items-center justify-between text-xs transition-colors hover:bg-stone-50 px-1 rounded-lg">
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <span className="w-5 font-black text-stone-400 text-xs text-center">#{idx + 1}</span>
-                    <div className="min-w-0">
-                      <p className="font-black text-stone-900 truncate">{item.name}</p>
-                      <p className="text-[10px] text-stone-400 font-medium">{item.categoryName}</p>
+            {sortedItemSales.length > 0 ? (
+              <div className="divide-y divide-stone-100">
+                {sortedItemSales.map((item, idx) => (
+                  <div key={item.menuItemId} className="py-3 flex items-center justify-between text-xs transition-colors hover:bg-stone-50 px-1 rounded-lg">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span className="w-5 font-black text-stone-400 text-xs text-center">#{idx + 1}</span>
+                      <div className="min-w-0">
+                        <p className="font-black text-stone-900 truncate">{item.name}</p>
+                        <p className="text-[10px] text-stone-400 font-medium">{item.categoryName}</p>
+                      </div>
+                    </div>
+
+                    <div className="text-right shrink-0">
+                      <span className="font-black text-stone-900 text-sm">{item.unitsSold} units</span>
+                      <p className="text-[11px] text-emerald-700 font-bold mt-0.5">₹{item.revenue}</p>
                     </div>
                   </div>
-
-                  <div className="text-right shrink-0">
-                    <span className="font-black text-stone-900 text-sm">{item.unitsSold} units</span>
-                    <p className="text-[11px] text-emerald-700 font-bold mt-0.5">₹{item.revenue}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="py-8 text-center text-stone-400 text-xs">
+                <Utensils className="w-7 h-7 mx-auto mb-2 text-stone-300" />
+                <p className="font-semibold text-stone-500">No Dish Orders Recorded</p>
+                <p className="text-[10px] text-stone-400 mt-0.5">Dish rankings and sold unit metrics will update live with every placed order.</p>
+              </div>
+            )}
           </div>
 
           {/* Peak Hours Chart */}
@@ -451,8 +483,12 @@ export const OwnerAnalyticsView: React.FC = () => {
                 <p className="text-[10px] text-stone-400">Total aggregate across all reviews and stars</p>
               </div>
               <div className="text-right">
-                <span className="font-black text-stone-900 text-lg">★ {analytics.avgRating}</span>
-                <span className="text-stone-400 text-[10px] block">out of 5.0</span>
+                <span className="font-black text-stone-900 text-lg">
+                  {analytics.avgRating > 0 ? `★ ${analytics.avgRating}` : '—'}
+                </span>
+                <span className="text-stone-400 text-[10px] block">
+                  {analytics.avgRating > 0 ? 'out of 5.0' : 'No ratings yet'}
+                </span>
               </div>
             </div>
 
@@ -476,36 +512,44 @@ export const OwnerAnalyticsView: React.FC = () => {
           {/* Recent Reviews Feed */}
           <div className="space-y-2.5">
             <h4 className="text-xs font-black uppercase text-stone-400 tracking-wider">Recent Feedback Logs</h4>
-            {(analytics.recentReviews || []).map((rev) => (
-              <div key={rev.id} className="p-4 bg-white rounded-2xl border border-stone-200 text-xs space-y-2 shadow-3xs">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <span className="font-black text-stone-900">{rev.customerName}</span>
-                    <span className="text-stone-400 text-[10px] block font-medium">Order #{rev.orderNumber}</span>
+            {analytics.recentReviews && analytics.recentReviews.length > 0 ? (
+              analytics.recentReviews.map((rev) => (
+                <div key={rev.id} className="p-4 bg-white rounded-2xl border border-stone-200 text-xs space-y-2 shadow-3xs">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <span className="font-black text-stone-900">{rev.customerName}</span>
+                      <span className="text-stone-400 text-[10px] block font-medium">Order #{rev.orderNumber}</span>
+                    </div>
+                    <span className="bg-amber-50 text-amber-700 border border-amber-200 px-2.5 py-1 rounded-xl font-black flex items-center gap-0.5">
+                      ★ {rev.overallRating}.0
+                    </span>
                   </div>
-                  <span className="bg-amber-50 text-amber-700 border border-amber-200 px-2.5 py-1 rounded-xl font-black flex items-center gap-0.5">
-                    ★ {rev.overallRating}.0
-                  </span>
+                  {rev.comment ? (
+                    <p className="text-stone-600 italic leading-relaxed">"{rev.comment}"</p>
+                  ) : (
+                    <p className="text-stone-400 italic">No detailed comment provided.</p>
+                  )}
+                  
+                  {rev.itemRatings && rev.itemRatings.length > 0 && (
+                    <div className="pt-2 border-t border-stone-100 space-y-1">
+                      <p className="text-[9px] font-black uppercase tracking-wider text-stone-400">Dish Feedback:</p>
+                      {(rev.itemRatings || []).map((ir, i) => (
+                        <div key={i} className="flex justify-between items-center text-[10px] text-stone-500">
+                          <span className="truncate max-w-[70%] font-semibold">{ir.menuItemName}</span>
+                          <span className="text-amber-600 font-bold">★ {ir.rating}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                {rev.comment ? (
-                  <p className="text-stone-600 italic leading-relaxed">"{rev.comment}"</p>
-                ) : (
-                  <p className="text-stone-400 italic">No detailed comment provided.</p>
-                )}
-                
-                {rev.itemRatings && rev.itemRatings.length > 0 && (
-                  <div className="pt-2 border-t border-stone-100 space-y-1">
-                    <p className="text-[9px] font-black uppercase tracking-wider text-stone-400">Dish Feedback:</p>
-                    {(rev.itemRatings || []).map((ir, i) => (
-                      <div key={i} className="flex justify-between items-center text-[10px] text-stone-500">
-                        <span className="truncate max-w-[70%] font-semibold">{ir.menuItemName}</span>
-                        <span className="text-amber-600 font-bold">★ {ir.rating}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
+              ))
+            ) : (
+              <div className="py-8 bg-white rounded-2xl border border-stone-200 text-center text-stone-400 p-6 shadow-3xs">
+                <Star className="w-7 h-7 mx-auto mb-2 text-stone-300" />
+                <p className="font-semibold text-stone-500 text-xs">No Customer Reviews Yet</p>
+                <p className="text-[10px] text-stone-400 mt-0.5">Customer feedback and star ratings will stream here automatically upon review submission.</p>
               </div>
-            ))}
+            )}
           </div>
         </div>
       )}

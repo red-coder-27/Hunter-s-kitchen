@@ -3,6 +3,13 @@ import { useAuth } from '../../context/AuthContext';
 import { useNotification } from '../../context/NotificationContext';
 import { StaffSubRole } from '../../types';
 import {
+  validateName,
+  validatePhone,
+  validateEmail,
+  sanitizeTypingPhone,
+  sanitizeTypingName
+} from '../../utils/validation';
+import {
   User,
   Mail,
   Phone,
@@ -61,17 +68,33 @@ export const StaffProfileView: React.FC<StaffProfileViewProps> = () => {
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !email.trim() || !phone.trim()) {
-      setFeedback({ type: 'error', text: 'All fields (Name, Gmail, and Phone) are required.' });
+    
+    // Strict client-side validation & formatting
+    const nameRes = validateName(name);
+    if (!nameRes.isValid) {
+      setFeedback({ type: 'error', text: nameRes.error || 'Please enter a valid full name.' });
       return;
     }
+
+    const phoneRes = validatePhone(phone);
+    if (!phoneRes.isValid) {
+      setFeedback({ type: 'error', text: phoneRes.error || 'Please enter a valid 10-digit mobile number.' });
+      return;
+    }
+
+    const emailRes = validateEmail(email);
+    if (!emailRes.isValid) {
+      setFeedback({ type: 'error', text: emailRes.error || 'Please enter a valid Gmail address.' });
+      return;
+    }
+
     setIsSaving(true);
     setFeedback(null);
     try {
       await updateUserProfile({
-        name: name.trim(),
-        email: email.trim(),
-        phone: phone.trim()
+        name: nameRes.value,
+        email: emailRes.value,
+        phone: phoneRes.value
       });
       setIsEditing(false);
       setFeedback({ type: 'success', text: 'Staff profile updated successfully!' });
@@ -88,24 +111,12 @@ export const StaffProfileView: React.FC<StaffProfileViewProps> = () => {
 
   const getRoleBadge = (role: StaffSubRole) => {
     switch (role) {
-      case 'KITCHEN_MANAGER':
-        return { label: 'Kitchen Operations Manager', icon: <Award className="w-3.5 h-3.5 text-red-600" />, color: 'bg-red-50 text-red-800 border-red-200' };
       case 'GENERAL_MANAGER':
-        return { label: 'General Manager', icon: <Shield className="w-3.5 h-3.5 text-red-600" />, color: 'bg-red-50 text-red-800 border-red-200' };
-      case 'HEAD_CHEF':
-        return { label: 'Head Executive Chef', icon: <ChefHat className="w-3.5 h-3.5 text-amber-600" />, color: 'bg-amber-50 text-amber-800 border-amber-200' };
-      case 'KITCHEN_CHEF':
-        return { label: 'Head Kitchen Chef', icon: <UtensilsCrossed className="w-3.5 h-3.5 text-amber-600" />, color: 'bg-amber-50 text-amber-800 border-amber-200' };
-      case 'LINE_COOK':
-        return { label: 'Line Cook & Prep Station', icon: <CookingPot className="w-3.5 h-3.5 text-amber-600" />, color: 'bg-amber-50 text-amber-800 border-amber-200' };
-      case 'ORDER_BILLER':
-        return { label: 'Order Biller & Terminal', icon: <ClipboardList className="w-3.5 h-3.5 text-blue-600" />, color: 'bg-blue-50 text-blue-800 border-blue-200' };
-      case 'FRONT_DESK':
-        return { label: 'Front Desk & Reception', icon: <ClipboardList className="w-3.5 h-3.5 text-blue-600" />, color: 'bg-blue-50 text-blue-800 border-blue-200' };
-      case 'STORE_DISPATCHER':
-        return { label: 'Fleet & Store Dispatcher', icon: <Bike className="w-3.5 h-3.5 text-emerald-600" />, color: 'bg-emerald-50 text-emerald-800 border-emerald-200' };
+        return { label: 'General Manager (All Access & Deliveries)', icon: <Shield className="w-3.5 h-3.5 text-red-600" />, color: 'bg-red-50 text-red-800 border-red-200' };
+      case 'KITCHEN_STAFF':
+      case 'STAFF':
       default:
-        return { label: 'Kitchen Operations Staff', icon: <Award className="w-3.5 h-3.5 text-stone-600" />, color: 'bg-stone-50 text-stone-800 border-stone-200' };
+        return { label: 'Kitchen Staff (Order Management & Dispatch)', icon: <Award className="w-3.5 h-3.5 text-blue-600" />, color: 'bg-blue-50 text-blue-800 border-blue-200' };
     }
   };
 
@@ -198,7 +209,9 @@ export const StaffProfileView: React.FC<StaffProfileViewProps> = () => {
               <input
                 type="text"
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => setName(e.target.value.slice(0, 70))}
+                maxLength={70}
+                placeholder="Enter full name"
                 className="w-full p-2.5 border border-stone-300 rounded-xl font-semibold text-stone-900 focus:ring-2 focus:ring-red-600/20 focus:border-red-600 outline-none"
                 required
               />
@@ -211,6 +224,7 @@ export const StaffProfileView: React.FC<StaffProfileViewProps> = () => {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  placeholder="name@gmail.com"
                   className="w-full p-2.5 border border-stone-300 rounded-xl font-semibold text-stone-900 focus:ring-2 focus:ring-red-600/20 focus:border-red-600 outline-none"
                   required
                 />
@@ -221,7 +235,9 @@ export const StaffProfileView: React.FC<StaffProfileViewProps> = () => {
                 <input
                   type="tel"
                   value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
+                  onChange={(e) => setPhone(sanitizeTypingPhone(e.target.value))}
+                  placeholder="e.g. 9876543210"
+                  maxLength={10}
                   className="w-full p-2.5 border border-stone-300 rounded-xl font-semibold text-stone-900 focus:ring-2 focus:ring-red-600/20 focus:border-red-600 outline-none"
                   required
                 />

@@ -18,7 +18,7 @@ export const FloatingCartBar: React.FC<FloatingCartBarProps> = ({
   }
 
   return (
-    <div className="fixed bottom-16 md:bottom-6 left-4 right-4 md:left-1/2 md:-translate-x-1/2 md:w-full md:max-w-xl z-50 animate-in slide-in-from-bottom-4 duration-200 pointer-events-auto">
+    <div className="w-full pointer-events-auto animate-in slide-in-from-bottom-3 duration-200">
       <div
         onClick={onNavigateToCart}
         className="bg-gradient-to-r from-red-800 via-red-700 to-red-800 text-white rounded-2xl p-3 sm:p-3.5 shadow-2xl flex items-center justify-between cursor-pointer hover:from-red-900 hover:to-red-800 transition-all duration-200 border border-red-500/40 shadow-red-950/20 active:scale-[0.99] group backdrop-blur-xs"
@@ -38,7 +38,7 @@ export const FloatingCartBar: React.FC<FloatingCartBarProps> = ({
               </span>
             </div>
             <p className="text-[10px] sm:text-[11px] text-red-200 font-medium leading-none mt-0.5">
-              Hunter's Kitchen • Tap to checkout
+              Hunter's Kitchen • Tap to view cart
             </p>
           </div>
         </div>

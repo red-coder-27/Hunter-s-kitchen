@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MenuItem, Category } from '../../types';
 import { apiService } from '../../services/api';
 import {
@@ -240,30 +240,49 @@ export const StaffInventoryView: React.FC<StaffInventoryViewProps> = ({ onBack }
         </div>
 
         {/* Category Pills */}
-        <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-thin">
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
           <button
             onClick={() => setSelectedCategory('ALL')}
-            className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold whitespace-nowrap transition-all cursor-pointer ${
+            className={`group inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-extrabold whitespace-nowrap transition-all cursor-pointer ${
               selectedCategory === 'ALL'
-                ? 'bg-stone-800 text-white'
-                : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                ? 'bg-stone-800 text-white shadow-2xs'
+                : 'bg-stone-100 text-stone-600 hover:bg-stone-200 hover:text-stone-900'
             }`}
           >
-            All Categories
+            <span>All Categories</span>
+            <span
+              className={`inline-flex items-center justify-center px-1.5 py-0.2 text-[9px] font-black rounded-full min-w-4 transition-colors ${
+                selectedCategory === 'ALL'
+                  ? 'bg-white/20 text-white'
+                  : 'bg-stone-200/80 text-stone-700'
+              }`}
+            >
+              {items.length}
+            </span>
           </button>
           {categories.map((cat) => {
             const count = items.filter((i) => i.categoryId === cat.id).length;
+            const isSelected = selectedCategory === cat.id;
             return (
               <button
                 key={cat.id}
                 onClick={() => setSelectedCategory(cat.id)}
-                className={`px-2.5 py-1 rounded-lg text-[11px] font-extrabold whitespace-nowrap transition-all cursor-pointer ${
-                  selectedCategory === cat.id
-                    ? 'bg-stone-800 text-white'
-                    : 'bg-stone-100 text-stone-600 hover:bg-stone-200'
+                className={`group inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-extrabold whitespace-nowrap transition-all cursor-pointer ${
+                  isSelected
+                    ? 'bg-stone-800 text-white shadow-2xs'
+                    : 'bg-stone-100 text-stone-600 hover:bg-stone-200 hover:text-stone-900'
                 }`}
               >
-                {cat.name} ({count})
+                <span>{cat.name}</span>
+                <span
+                  className={`inline-flex items-center justify-center px-1.5 py-0.2 text-[9px] font-black rounded-full min-w-4 transition-colors ${
+                    isSelected
+                      ? 'bg-white/20 text-white'
+                      : 'bg-stone-200/80 text-stone-700'
+                  }`}
+                >
+                  {count}
+                </span>
               </button>
             );
           })}
@@ -314,7 +333,7 @@ export const StaffInventoryView: React.FC<StaffInventoryViewProps> = ({ onBack }
                     <div className="flex items-center gap-2 pt-0.5">
                       <span className="text-xs font-black text-red-700">₹{item.price}</span>
                       <span className="text-[10px] text-stone-400 font-semibold">
-                        Prep: {item.preparationTimeMinutes || 15}m
+                        Prep: {item.prepTimeMinutes || 15}m
                       </span>
                     </div>
                   </div>

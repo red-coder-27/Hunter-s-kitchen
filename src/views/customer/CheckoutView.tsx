@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useCart } from '../../context/CartContext';
 import { useAuth } from '../../context/AuthContext';
-import { useNotification } from '../../context/NotificationContext';
 import { apiService } from '../../services/api';
 import { PaymentMethod, Order, ScheduledSlot, Address } from '../../types';
 import {
@@ -62,7 +61,6 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
     setIsAddressModalOpen
   } = useCart();
   const { currentUser, settings } = useAuth();
-  const { addNotification } = useNotification();
 
   useEffect(() => {
     onCheckoutFlowChange(true);
@@ -295,19 +293,6 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
       };
 
       const createdOrder = await apiService.createOrder(orderPayload);
-      
-      // Dispatch order notification & chime
-      try {
-        addNotification({
-          title: 'Order Confirmed! 🎉',
-          message: `Order #${createdOrder.orderNumber} placed! Sent directly to Hunter's Kitchen Owner Dashboard.`,
-          type: 'ORDER',
-          orderId: createdOrder.id,
-          status: 'PLACED'
-        });
-      } catch (e) {
-        // Notification context silent fallback
-      }
 
       // Trigger order confirmed tick animation modal
       setConfirmedOrder(createdOrder);
@@ -363,20 +348,20 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
   }
 
   return (
-    <div className="pb-32 md:pb-20 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-7 space-y-6">
+    <div className="pb-32 md:pb-20 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-5 sm:py-7 space-y-6">
       {/* Top Header Bar */}
       <div className="flex items-center justify-between border-b border-stone-200/80 pb-4">
         <div className="flex items-center gap-3.5">
           <button
             onClick={onBackToCart}
             className="w-10 h-10 rounded-full bg-stone-100 hover:bg-stone-200 active:scale-95 flex items-center justify-center text-stone-700 transition-all cursor-pointer shadow-xs"
-            title="Back to Cart"
+            title="Back to Menu"
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
           <div>
-            <h1 className="text-xl sm:text-2xl font-black text-stone-900 tracking-tight">Checkout</h1>
-            <p className="text-xs sm:text-sm text-stone-500 font-medium mt-0.5">Review items & finalize your order</p>
+            <h1 className="text-xl sm:text-2xl font-black text-stone-900 tracking-tight">Cart</h1>
+            <p className="text-xs sm:text-sm text-stone-500 font-medium mt-0.5">Review items & place your order</p>
           </div>
         </div>
 
@@ -396,8 +381,12 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
         </div>
       )}
 
-      {/* 1. ORDER ITEMS SUMMARY CARD */}
-      <div className="bg-white rounded-2xl border border-stone-200/90 p-5 sm:p-6 shadow-xs space-y-4">
+      {/* 2-Column Responsive Layout: Left (Items, Fulfillment, Address, Instructions), Right (Payment & Bill Breakdown) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* Left Column (Items & Delivery details) */}
+        <div className="lg:col-span-7 space-y-6">
+          {/* 1. ORDER ITEMS SUMMARY CARD */}
+          <div className="bg-white rounded-2xl border border-stone-200/90 p-5 sm:p-6 shadow-xs space-y-4">
         <div className="flex items-center justify-between pb-3 border-b border-stone-100">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-xl bg-red-50 text-red-700 flex items-center justify-center font-bold">
@@ -648,14 +637,14 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
           )}
         </div>
       ) : (
-        <div className="bg-stone-900 text-white rounded-2xl p-5 sm:p-6 shadow-md space-y-2.5">
-          <div className="flex items-center gap-2.5 text-amber-400 font-extrabold text-sm sm:text-base uppercase tracking-wide">
-            <Store className="w-5 h-5 text-amber-400" />
+        <div className="bg-gradient-to-r from-red-900 via-red-800 to-stone-900 text-white rounded-2xl p-5 sm:p-6 shadow-md shadow-red-950/20 space-y-2.5 border border-red-700/40">
+          <div className="flex items-center gap-2.5 text-amber-300 font-extrabold text-sm sm:text-base uppercase tracking-wide">
+            <Store className="w-5 h-5 text-amber-300" />
             <span>Self Pickup Location</span>
           </div>
           <div className="pl-7 space-y-1">
             <p className="text-base sm:text-lg font-bold text-white">{settings?.restaurantName || "Hunter's Kitchen"}</p>
-            <p className="text-sm text-stone-300 leading-relaxed">{settings?.address || "42 Richmond Road, Shanthi Nagar, Bengaluru"}</p>
+            <p className="text-sm text-red-100 leading-relaxed">{settings?.address || "42 Richmond Road, Shanthi Nagar, Bengaluru"}</p>
             <p className="text-xs text-amber-300 pt-1">
               ⚡ Your food will be hot and packed ready for counter collection in ~15 minutes.
             </p>
@@ -684,7 +673,10 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
           className="w-full p-3.5 rounded-xl border border-stone-200 bg-stone-50/50 text-sm text-stone-800 placeholder:text-stone-400 focus:bg-white focus:ring-2 focus:ring-red-600 focus:outline-none transition-all"
         />
       </div>
+    </div>
 
+    {/* Right Column: Sticky Payment Method & Final Bill Breakdown (lg:col-span-5) */}
+    <div className="lg:col-span-5 space-y-6 lg:sticky lg:top-20">
       {/* 5. SELECT PAYMENT METHOD */}
       <div className="bg-white rounded-2xl border border-stone-200/90 p-5 sm:p-6 shadow-xs space-y-4">
         <div className="flex items-center justify-between pb-2 border-b border-stone-100">
@@ -985,7 +977,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
               {/* Action Button */}
               <button
                 onClick={() => setShowTaxInfo(false)}
-                className="w-full py-3 rounded-xl bg-stone-900 hover:bg-black text-white text-sm font-bold shadow-md transition-colors cursor-pointer"
+                className="w-full py-3 rounded-xl bg-red-700 hover:bg-red-800 text-white text-sm font-bold shadow-md transition-colors cursor-pointer"
               >
                 Got It
               </button>
@@ -1019,6 +1011,8 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
           </button>
         </div>
       </div>
+    </div>
+  </div>
 
       {/* ADDRESS SELECTOR / ADD MODAL */}
       {showAddressModal && (

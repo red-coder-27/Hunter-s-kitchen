@@ -1,10 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { MenuItem, Category } from '../../types';
 import { apiService } from '../../services/api';
 import { OwnerMenuItemSkeleton } from '../../components/Skeletons';
+import { DeleteMenuItemModal } from '../../components/DeleteMenuItemModal';
+import { useNotification } from '../../context/NotificationContext';
 import { Plus, Edit2, Trash2, Search, Flame, ToggleLeft, ToggleRight, Check, X } from 'lucide-react';
 
 export const OwnerMenuView: React.FC = () => {
+  const { addNotification } = useNotification();
   const [categories, setCategories] = useState<Category[]>([]);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>('ALL');
@@ -14,6 +17,9 @@ export const OwnerMenuView: React.FC = () => {
   // Add / Edit Modal State
   const [showItemModal, setShowItemModal] = useState(false);
   const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
+
+  // In-App Delete Confirmation Modal State
+  const [deletingItem, setDeletingItem] = useState<MenuItem | null>(null);
 
   // Form Fields
   const [name, setName] = useState('');
@@ -26,22 +32,35 @@ export const OwnerMenuView: React.FC = () => {
   const [prepTimeMinutes, setPrepTimeMinutes] = useState(20);
   const [isBestseller, setIsBestseller] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [imageError, setImageError] = useState<string | null>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    setImageError(null);
+
     // Validate type: png or jpeg (jpg)
     const allowedTypes = ['image/png', 'image/jpeg', 'image/jpg'];
     if (!allowedTypes.includes(file.type)) {
-      alert('Invalid format. Only PNG or JPEG formats are allowed.');
+      setImageError('Invalid format. Only PNG or JPEG formats are allowed.');
+      addNotification({
+        title: 'Invalid Image Format',
+        message: 'Only PNG and JPEG formats are allowed.',
+        type: 'INFO'
+      });
       return;
     }
 
     // Validate size: 5 MB max
     const maxSize = 5 * 1024 * 1024;
     if (file.size > maxSize) {
-      alert('File is too large. Maximum size is 5 MB.');
+      setImageError('File is too large. Maximum size is 5 MB.');
+      addNotification({
+        title: 'File Too Large',
+        message: 'Maximum allowed image size is 5 MB.',
+        type: 'INFO'
+      });
       return;
     }
 
@@ -71,6 +90,7 @@ export const OwnerMenuView: React.FC = () => {
 
   const handleOpenAddModal = () => {
     setEditingItem(null);
+    setImageError(null);
     setName('');
     setCategoryId(categories[0]?.id || 'cat_biriyani');
     setPrice(200);
@@ -85,6 +105,7 @@ export const OwnerMenuView: React.FC = () => {
 
   const handleOpenEditModal = (item: MenuItem) => {
     setEditingItem(item);
+    setImageError(null);
     setName(item.name);
     setCategoryId(item.categoryId);
     setPrice(item.price);
@@ -124,6 +145,11 @@ export const OwnerMenuView: React.FC = () => {
 
       setShowItemModal(false);
       await loadMenu();
+      addNotification({
+        title: editingItem ? 'Dish Updated' : 'Dish Added',
+        message: `"${name}" was successfully ${editingItem ? 'updated' : 'added to the menu'}.`,
+        type: 'SUCCESS'
+      });
     } catch (err) {
       console.error(err);
     } finally {
@@ -133,22 +159,44 @@ export const OwnerMenuView: React.FC = () => {
 
   const handleToggleAvailability = async (item: MenuItem) => {
     try {
-      await apiService.updateItemAvailability(item.id, !item.isAvailable);
+      const nextAvailable = !item.isAvailable;
+      await apiService.updateItemAvailability(item.id, nextAvailable);
       await loadMenu();
+      addNotification({
+        title: nextAvailable ? 'Dish In Stock' : 'Dish Out of Stock',
+        message: `"${item.name}" marked as ${nextAvailable ? 'in stock' : 'out of stock'}.`,
+        type: 'INFO'
+      });
     } catch (err) {
       console.error(err);
     }
   };
 
-  const handleDeleteItem = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this dish from the menu?')) return;
+  const handleConfirmDelete = async (id: string) => {
     try {
+      const dishNameToDelete = deletingItem?.name || 'Dish';
       await apiService.deleteMenuItem(id);
+      setDeletingItem(null);
       await loadMenu();
-    } catch (err) {
-      console.error(err);
+      addNotification({
+        title: 'Dish Deleted',
+        message: `"${dishNameToDelete}" was permanently removed from the menu.`,
+        type: 'SUCCESS'
+      });
+    } catch (err: any) {
+      console.error('Failed to delete item:', err);
+      throw err;
     }
   };
+
+  // Compute count of dishes per category in real time
+  const categoryCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const item of menuItems) {
+      counts[item.categoryId] = (counts[item.categoryId] || 0) + 1;
+    }
+    return counts;
+  }, [menuItems]);
 
   const filteredItems = menuItems.filter((i) => {
     if (selectedCategory !== 'ALL' && i.categoryId !== selectedCategory) return false;
@@ -188,30 +236,52 @@ export const OwnerMenuView: React.FC = () => {
       </div>
 
       {/* Categories Horizontal */}
-      <div className="flex gap-2 overflow-x-auto no-scrollbar py-1">
+      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1 scroll-smooth">
         <button
           onClick={() => setSelectedCategory('ALL')}
-          className={`px-3 py-1.5 rounded-xl text-[11px] font-extrabold whitespace-nowrap transition-all border ${
+          className={`group inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all border cursor-pointer ${
             selectedCategory === 'ALL'
-              ? 'bg-stone-900 text-white border-stone-900 shadow-2xs'
-              : 'bg-white text-stone-600 border-stone-200'
+              ? 'bg-stone-900 text-white border-stone-900 shadow-sm'
+              : 'bg-white text-stone-600 border-stone-200 hover:border-stone-300 hover:text-stone-900 hover:bg-stone-50'
           }`}
         >
-          All ({menuItems.length})
-        </button>
-        {categories.map((cat) => (
-          <button
-            key={cat.id}
-            onClick={() => setSelectedCategory(cat.id)}
-            className={`px-3 py-1.5 rounded-xl text-[11px] font-extrabold whitespace-nowrap transition-all border ${
-              selectedCategory === cat.id
-                ? 'bg-stone-900 text-white border-stone-900 shadow-2xs'
-                : 'bg-white text-stone-600 border-stone-200'
+          <span>All</span>
+          <span
+            className={`inline-flex items-center justify-center px-1.5 py-0.5 text-[10px] font-black rounded-full min-w-5 transition-colors ${
+              selectedCategory === 'ALL'
+                ? 'bg-white/20 text-white'
+                : 'bg-stone-100 text-stone-600 group-hover:bg-stone-200 group-hover:text-stone-900'
             }`}
           >
-            {cat.name}
-          </button>
-        ))}
+            {menuItems.length}
+          </span>
+        </button>
+        {categories.map((cat) => {
+          const count = categoryCounts[cat.id] || 0;
+          const isSelected = selectedCategory === cat.id;
+          return (
+            <button
+              key={cat.id}
+              onClick={() => setSelectedCategory(cat.id)}
+              className={`group inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all border cursor-pointer ${
+                isSelected
+                  ? 'bg-stone-900 text-white border-stone-900 shadow-sm'
+                  : 'bg-white text-stone-600 border-stone-200 hover:border-stone-300 hover:text-stone-900 hover:bg-stone-50'
+              }`}
+            >
+              <span>{cat.name}</span>
+              <span
+                className={`inline-flex items-center justify-center px-1.5 py-0.5 text-[10px] font-black rounded-full min-w-5 transition-colors ${
+                  isSelected
+                    ? 'bg-white/20 text-white'
+                    : 'bg-stone-100 text-stone-600 group-hover:bg-stone-200 group-hover:text-stone-900'
+                }`}
+              >
+                {count}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
       {/* Items List */}
@@ -267,8 +337,9 @@ export const OwnerMenuView: React.FC = () => {
                     <Edit2 className="w-3.5 h-3.5" />
                   </button>
                   <button
-                    onClick={() => handleDeleteItem(item.id)}
-                    className="p-1.5 text-red-600 hover:text-red-800 bg-red-50 rounded-lg"
+                    onClick={() => setDeletingItem(item)}
+                    className="p-1.5 text-red-600 hover:text-red-800 bg-red-50 hover:bg-red-100 rounded-lg transition-colors cursor-pointer"
+                    title={`Delete ${item.name}`}
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
@@ -370,6 +441,11 @@ export const OwnerMenuView: React.FC = () => {
                     <p className="text-[10px] text-stone-500 mt-0.5 leading-normal font-medium">
                       PNG or JPEG format only • Max 5 MB • Resolution: 900x900 pixels
                     </p>
+                    {imageError && (
+                      <p className="text-[11px] text-red-600 font-semibold mt-1">
+                        ⚠️ {imageError}
+                      </p>
+                    )}
                   </div>
                 </div>
 
@@ -435,6 +511,14 @@ export const OwnerMenuView: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* In-App Delete Confirmation Modal */}
+      <DeleteMenuItemModal
+        isOpen={!!deletingItem}
+        item={deletingItem}
+        onClose={() => setDeletingItem(null)}
+        onConfirm={handleConfirmDelete}
+      />
     </div>
   );
 };

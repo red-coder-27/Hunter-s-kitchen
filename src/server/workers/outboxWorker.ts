@@ -38,7 +38,7 @@ class OutboxWorker {
     this.isProcessing = true;
 
     try {
-      const pendingEvents = outboxRepository.getPendingEvents(10);
+      const pendingEvents = await outboxRepository.getPendingEvents(10);
       if (pendingEvents.length === 0) {
         this.isProcessing = false;
         return;
@@ -53,7 +53,7 @@ class OutboxWorker {
   }
 
   private async processEvent(event: OutboxEvent): Promise<void> {
-    outboxRepository.update(event.id, { 
+    await outboxRepository.update(event.id, { 
       status: 'PROCESSING',
       processingStartedAt: new Date().toISOString()
     });
@@ -74,7 +74,7 @@ class OutboxWorker {
       });
 
       // Mark completed
-      outboxRepository.update(event.id, {
+      await outboxRepository.update(event.id, {
         status: 'COMPLETED',
         processedAt: new Date().toISOString()
       });
@@ -86,7 +86,7 @@ class OutboxWorker {
       const backoffSec = Math.pow(2, retryCount);
       const nextRetryAt = new Date(Date.now() + backoffSec * 1000).toISOString();
 
-      outboxRepository.update(event.id, {
+      await outboxRepository.update(event.id, {
         status: isDeadLetter ? 'DEAD_LETTER' : 'FAILED',
         retryCount,
         lastError: err.message || 'Unknown dispatch error',

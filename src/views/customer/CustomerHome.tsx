@@ -215,36 +215,36 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({ currentTab, onNaviga
             </div>
           </div>
 
-          {/* Search Header Banner */}
-          <div className="px-4 py-3 bg-stone-900 text-white shadow-md">
+          {/* Search Header Banner (Brand Red & Amber) */}
+          <div className="px-4 py-3 bg-gradient-to-r from-red-900 via-red-800 to-red-900 text-white shadow-md shadow-red-950/15 border-b border-red-800/40">
             <div className="max-w-7xl mx-auto space-y-2.5">
               {/* Full-width Search Bar */}
               <div
                 onClick={onNavigateToSearch}
-                className="w-full bg-stone-800 hover:bg-stone-750 transition-all duration-200 rounded-xl py-2.5 px-4 flex items-center justify-between text-stone-200 text-xs cursor-pointer border-2 border-stone-500 hover:border-amber-400 shadow-sm hover:shadow-md hover:shadow-amber-500/10 group"
+                className="w-full bg-red-950/40 hover:bg-red-950/60 transition-all duration-200 rounded-xl py-2.5 px-4 flex items-center justify-between text-stone-100 text-xs cursor-pointer border-2 border-red-500/40 hover:border-amber-400 shadow-inner group"
               >
                 <div className="flex items-center gap-2.5 min-w-0">
-                  <Search className="w-4 h-4 text-amber-400 shrink-0 group-hover:scale-110 transition-transform" />
+                  <Search className="w-4 h-4 text-amber-300 shrink-0 group-hover:scale-110 transition-transform" />
                   <TypewriterSearchPlaceholder />
                 </div>
-                <div className="hidden sm:flex items-center gap-1.5 text-[11px] font-semibold text-stone-400 bg-stone-750 px-2.5 py-0.5 rounded-lg border border-stone-600 group-hover:text-amber-300 group-hover:border-amber-400/50 transition-colors">
+                <div className="hidden sm:flex items-center gap-1.5 text-[11px] font-semibold text-amber-200 bg-red-950/60 px-2.5 py-0.5 rounded-lg border border-red-500/30 group-hover:text-amber-100 transition-colors">
                   <span>Explore Menu</span>
                   <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
                 </div>
               </div>
             </div>
           </div>
-                {/* Diet Preference Segmented Control */}
+          {/* Diet Preference Segmented Control */}
           <div className="flex items-center justify-between gap-2 px-4 max-w-7xl mx-auto pt-3">
-            <span className="text-[11px] font-bold text-stone-400 uppercase tracking-wider">Diet Preference</span>
-            <div className="inline-flex p-1 bg-stone-800 rounded-xl border border-stone-700/80 text-xs font-bold">
+            <span className="text-[11px] font-bold text-stone-500 uppercase tracking-wider">Diet Preference</span>
+            <div className="inline-flex p-1 bg-stone-100 rounded-xl border border-stone-200 text-xs font-bold">
               <button
                 type="button"
                 onClick={() => setDietFilter('ALL')}
                 className={`px-3 py-1 rounded-lg transition-all ${
                   dietFilter === 'ALL'
-                    ? 'bg-stone-100 text-stone-950 shadow-xs'
-                    : 'text-stone-400 hover:text-white'
+                    ? 'bg-red-700 text-white shadow-xs'
+                    : 'text-stone-500 hover:text-stone-900'
                 }`}
               >
                 All
@@ -318,21 +318,31 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({ currentTab, onNaviga
               <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
                 <button
                   onClick={() => setSelectedCategory('ALL')}
-                  className={`px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all border ${
+                  className={`group inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all border ${
                     selectedCategory === 'ALL'
                       ? 'bg-red-700 text-white border-red-700 shadow-sm'
                       : 'bg-white text-stone-700 border-stone-200 hover:bg-stone-100'
                   }`}
                 >
-                  All Items
+                  <span>All Items</span>
+                  <span
+                    className={`inline-flex items-center justify-center px-1.5 py-0.5 text-[10px] font-black rounded-full min-w-5 leading-none transition-colors ${
+                      selectedCategory === 'ALL'
+                        ? 'bg-white/20 text-white'
+                        : 'bg-stone-100 text-stone-600'
+                    }`}
+                  >
+                    {menuItems.length}
+                  </span>
                 </button>
                 {safeCategories.map((cat) => {
                   const isSelected = selectedCategory === cat.id;
+                  const count = menuItems.filter((i) => i.categoryId === cat.id).length;
                   return (
                     <button
                       key={cat.id}
                       onClick={() => setSelectedCategory(cat.id)}
-                      className={`px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap flex items-center gap-1.5 transition-all border ${
+                      className={`group inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all border ${
                         isSelected
                           ? 'bg-red-700 text-white border-red-700 shadow-sm'
                           : 'bg-white text-stone-700 border-stone-200 hover:bg-stone-100'
@@ -340,6 +350,15 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({ currentTab, onNaviga
                     >
                       <span>{cat.icon || '🍱'}</span>
                       <span>{cat.name}</span>
+                      <span
+                        className={`inline-flex items-center justify-center px-1.5 py-0.5 text-[10px] font-black rounded-full min-w-5 leading-none transition-colors ${
+                          isSelected
+                            ? 'bg-white/20 text-white'
+                            : 'bg-stone-100 text-stone-600'
+                        }`}
+                      >
+                        {count}
+                      </span>
                     </button>
                   );
                 })}

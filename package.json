@@ -5,12 +5,16 @@
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
-    "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
+    "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs && esbuild database/scripts/migrate_schema.ts --bundle --platform=node --format=cjs --packages=external --outfile=dist/migrate.cjs && esbuild scripts/migrate_json_to_postgres.ts --bundle --platform=node --format=cjs --packages=external --outfile=dist/seed.cjs",
     "start": "node dist/server.cjs",
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
-    "test:verification": "tsx scripts/verify-production.ts"
+    "test:verification": "tsx scripts/verify-production.ts",
+    "db:view": "tsx scripts/view-database.ts",
+    "db:verify": "tsx scripts/verify-postgres-production.ts",
+    "db:migrate": "node dist/migrate.cjs",
+    "db:seed": "node dist/seed.cjs"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
@@ -29,6 +33,7 @@
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
     "nodemailer": "^10.0.9",
+    "pg": "^8.23.1",
     "react": "^19.0.1",
     "react-dom": "^19.0.1",
     "vite": "^6.2.3"
@@ -42,6 +47,9 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^22.14.0",
     "@types/nodemailer": "^8.0.1",
+    "@types/pg": "^8.23.1",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
     "autoprefixer": "^10.4.21",
     "esbuild": "^0.25.0",
     "tailwindcss": "^4.1.14",

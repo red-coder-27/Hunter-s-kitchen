@@ -90,8 +90,83 @@ export class RedisService {
     const normalized = email.trim().toLowerCase();
     const prefix = purpose === 'LOGIN' ? 'otp:login' : purpose === 'EMAIL_CHANGE' ? 'otp:email_change' : 'otp:pwd_reset';
     const key = `${prefix}:${normalized}`;
+    const attemptsKey = `${key}:attempts`;
     await this.set(key, otp, ttlSeconds);
+    await this.del(attemptsKey);
     logger.info(`Stored OTP for ${normalized} (${purpose}) in Redis with ${ttlSeconds}s TTL`);
+  }
+
+  // Detailed OTP verification with friendly attempt tracking & second chance management
+  public async verifyOtpDetailed(
+    email: string,
+    otp: string,
+    purpose: 'LOGIN' | 'FORGOT_PASSWORD' | 'EMAIL_CHANGE' = 'FORGOT_PASSWORD',
+    maxAttempts: number = 5
+  ): Promise<{
+    valid: boolean;
+    status: 'SUCCESS' | 'INCORRECT' | 'EXPIRED' | 'MAX_ATTEMPTS_EXCEEDED';
+    attemptsRemaining?: number;
+    message: string;
+  }> {
+    const normalized = email.trim().toLowerCase();
+    const prefix = purpose === 'LOGIN' ? 'otp:login' : purpose === 'EMAIL_CHANGE' ? 'otp:email_change' : 'otp:pwd_reset';
+    const key = `${prefix}:${normalized}`;
+    const attemptsKey = `${key}:attempts`;
+    const stored = await this.get(key);
+
+    if (!stored) {
+      return {
+        valid: false,
+        status: 'EXPIRED',
+        message: 'This verification code has expired. Please click "Resend code" to receive a fresh PIN in your Gmail.'
+      };
+    }
+
+    const currentAttempts = parseInt((await this.get(attemptsKey)) || '0', 10);
+    if (currentAttempts >= maxAttempts) {
+      await this.del(key);
+      await this.del(attemptsKey);
+      return {
+        valid: false,
+        status: 'MAX_ATTEMPTS_EXCEEDED',
+        attemptsRemaining: 0,
+        message: 'Too many incorrect attempts. For your security, this verification code has been deactivated. Please click "Resend code" to get a new PIN.'
+      };
+    }
+
+    if (stored.trim() === otp.trim()) {
+      // Consume OTP immediately to prevent replay attacks
+      await this.del(key);
+      await this.del(attemptsKey);
+      return {
+        valid: true,
+        status: 'SUCCESS',
+        message: 'Verification code verified successfully.'
+      };
+    }
+
+    // Incorrect code entered: record attempt and give user another chance
+    const newAttempts = currentAttempts + 1;
+    const remaining = Math.max(0, maxAttempts - newAttempts);
+    await this.set(attemptsKey, String(newAttempts), 600);
+
+    if (remaining === 0) {
+      await this.del(key);
+      await this.del(attemptsKey);
+      return {
+        valid: false,
+        status: 'MAX_ATTEMPTS_EXCEEDED',
+        attemptsRemaining: 0,
+        message: 'Too many incorrect attempts. For your account security, please request a new verification code.'
+      };
+    }
+
+    return {
+      valid: false,
+      status: 'INCORRECT',
+      attemptsRemaining: remaining,
+      message: `Incorrect 6-digit PIN. Please check your Gmail and try again (${remaining} ${remaining === 1 ? 'attempt' : 'attempts'} remaining).`
+    };
   }
 
   public async verifyAndConsumeOTP(
@@ -99,22 +174,8 @@ export class RedisService {
     otp: string,
     purpose: 'LOGIN' | 'FORGOT_PASSWORD' | 'EMAIL_CHANGE' = 'FORGOT_PASSWORD'
   ): Promise<boolean> {
-    const normalized = email.trim().toLowerCase();
-    const prefix = purpose === 'LOGIN' ? 'otp:login' : purpose === 'EMAIL_CHANGE' ? 'otp:email_change' : 'otp:pwd_reset';
-    const key = `${prefix}:${normalized}`;
-    const stored = await this.get(key);
-
-    if (!stored) {
-      return false;
-    }
-
-    if (stored.trim() === otp.trim()) {
-      // Consume OTP immediately to prevent replay attacks
-      await this.del(key);
-      return true;
-    }
-
-    return false;
+    const result = await this.verifyOtpDetailed(email, otp, purpose);
+    return result.valid;
   }
 
   // Diagnostic Stats for Health & Security Observability

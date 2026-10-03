@@ -1,9 +1,11 @@
 process.env.NODE_ENV = 'test';
+import { postgresDb } from '../src/server/db/postgres';
 import { authService } from '../src/server/services/authService';
 import { db } from '../src/server/db';
 import { redisService } from '../src/server/services/redisService';
 
 async function runOtpVerification() {
+  await postgresDb.initialize();
   console.log('================================================================');
   console.log('🔐 HUNTER\'S KITCHEN — GMAIL OTP VERIFICATION SUITE');
   console.log('================================================================');
@@ -16,7 +18,7 @@ async function runOtpVerification() {
 
   // 1. Send OTP for Login
   console.log('\n👉 [TEST 1] Dispatching OTP for Login');
-  const targetEmail = 'customer1@hunterskitchen.com';
+  const targetEmail = 'hunterkitchen777@gmail.com';
   const dispatchRes = await authService.sendGmailOtp(targetEmail, 'LOGIN', context);
 
   if (!dispatchRes.success) {
@@ -85,7 +87,7 @@ async function runOtpVerification() {
 
   // 6. Forgot Password OTP Verification & Reset
   console.log('\n👉 [TEST 6] Forgot Password OTP & Password Reset');
-  const resetEmail = 'staff@hunterskitchen.com';
+  const resetEmail = 'hunterkitchen777@gmail.com';
   await authService.sendGmailOtp(resetEmail, 'FORGOT_PASSWORD', context);
   const resetOtp = await redisService.get(`otp:pwd_reset:${resetEmail}`);
   if (!resetOtp) {
@@ -97,7 +99,7 @@ async function runOtpVerification() {
   }
   console.log(`  ✓ Forgot password OTP verified, reset token: ${verifyReset.resetToken.substring(0, 12)}...`);
 
-  const resetResult = await authService.resetPassword(verifyReset.resetToken, 'Hunter@2026!', context);
+  const resetResult = await authService.resetPassword(verifyReset.resetToken, 'hunter__kitchen777', context);
   console.log(`  ✓ ${resetResult.message}`);
 
   console.log('\n================================================================');

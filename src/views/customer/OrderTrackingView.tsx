@@ -14,7 +14,6 @@ import {
   ChevronLeft,
   RefreshCw,
   AlertCircle,
-  Bell,
   Sparkles
 } from 'lucide-react';
 
@@ -41,12 +40,7 @@ export const OrderTrackingView: React.FC<OrderTrackingViewProps> = ({ orderId, o
   }, [order?.status, order?.id]);
 
   const prevStatusRef = useRef<OrderStatus | null>(null);
-  const [statusAlertBanner, setStatusAlertBanner] = useState<{
-    title: string;
-    message: string;
-    timestamp: string;
-    status: OrderStatus;
-  } | null>(null);
+
 
   const fetchOrder = async () => {
     try {
@@ -61,12 +55,7 @@ export const OrderTrackingView: React.FC<OrderTrackingViewProps> = ({ orderId, o
             data.id
           );
 
-          setStatusAlertBanner({
-            title: `Real-time Update: ${data.status.replace(/_/g, ' ')}`,
-            message: `Order #${data.orderNumber} status changed from ${prevStatusRef.current.replace(/_/g, ' ')} to ${data.status.replace(/_/g, ' ')}.`,
-            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            status: data.status
-          });
+
         }
         prevStatusRef.current = data.status;
         setOrder(data);
@@ -89,6 +78,7 @@ export const OrderTrackingView: React.FC<OrderTrackingViewProps> = ({ orderId, o
     setIsCancelling(true);
     try {
       await apiService.cancelOrder(orderId, cancelReason);
+      localStorage.removeItem('hk_active_tracking_order_id');
       await fetchOrder();
       setShowCancelModal(false);
     } catch (err) {
@@ -150,36 +140,10 @@ export const OrderTrackingView: React.FC<OrderTrackingViewProps> = ({ orderId, o
         </div>
       </div>
 
-      {/* Real-time Status Alert Banner (Shown when status changes live) */}
-      {statusAlertBanner && (
-        <div className="bg-amber-500/15 border-2 border-amber-500/80 rounded-2xl p-4 shadow-md flex items-start justify-between gap-3 animate-pulse">
-          <div className="flex items-start gap-3">
-            <div className="p-2 bg-amber-500 text-stone-950 rounded-xl font-bold shrink-0 mt-0.5">
-              <Bell className="w-5 h-5 animate-bounce" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-black uppercase tracking-wider text-amber-700 bg-amber-100 px-2 py-0.5 rounded-md border border-amber-200">
-                  ⚡ Real-Time Notification
-                </span>
-                <span className="text-[10px] text-stone-500 font-mono">{statusAlertBanner.timestamp}</span>
-              </div>
-              <h4 className="font-black text-stone-900 text-sm mt-1">{statusAlertBanner.title}</h4>
-              <p className="text-xs text-stone-700 mt-0.5">{statusAlertBanner.message}</p>
-            </div>
-          </div>
 
-          <button
-            onClick={() => setStatusAlertBanner(null)}
-            className="text-stone-400 hover:text-stone-700 p-1 rounded-lg"
-          >
-            <XCircle className="w-4 h-4" />
-          </button>
-        </div>
-      )}
 
       {/* Main Status Header Card */}
-      <div className="bg-gradient-to-br from-stone-900 via-stone-800 to-red-950 text-white rounded-2xl p-5 shadow-lg space-y-3 relative overflow-hidden">
+      <div className="bg-gradient-to-br from-red-900 via-red-800 to-stone-900 text-white rounded-2xl p-5 shadow-lg shadow-red-950/25 space-y-3 relative overflow-hidden border border-red-700/40">
         <div className="flex items-center justify-between">
           <div>
             <div className="flex items-center gap-1.5">
@@ -204,14 +168,14 @@ export const OrderTrackingView: React.FC<OrderTrackingViewProps> = ({ orderId, o
                 ? 'bg-emerald-500 text-white'
                 : isCancelledOrRejected
                 ? 'bg-red-600 text-white'
-                : 'bg-amber-500 text-stone-950 animate-pulse'
+                : 'bg-amber-400 text-stone-950 animate-pulse font-extrabold'
             }`}
           >
             {order.status.replace(/_/g, ' ')}
           </span>
         </div>
 
-        <div className="flex items-center justify-between pt-1 border-t border-stone-800 text-xs text-stone-300">
+        <div className="flex items-center justify-between pt-1 border-t border-red-700/50 text-xs text-red-100">
           <p>
             Placed on{' '}
             {(() => {
@@ -531,6 +495,7 @@ export const OrderTrackingView: React.FC<OrderTrackingViewProps> = ({ orderId, o
             <button
               onClick={() => {
                 localStorage.setItem(`delivered_dismissed_${order.id}`, 'true');
+                localStorage.removeItem('hk_active_tracking_order_id');
                 setShowDeliveredOverlay(false);
               }}
               style={{ animationDelay: '1.3s' }}

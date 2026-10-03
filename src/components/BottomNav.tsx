@@ -51,10 +51,10 @@ export const BottomNav: React.FC<BottomNavProps> = ({ currentTab, activeTab, onT
   } else if (currentRole === 'STAFF') {
     const staffRole = currentUser?.staffRole || 'GENERAL_MANAGER';
     const isManager = staffRole === 'KITCHEN_MANAGER' || staffRole === 'GENERAL_MANAGER';
-    const canAccessOrderDesk = isManager || staffRole === 'ORDER_BILLER' || staffRole === 'FRONT_DESK';
-    const canAccessChefStation = isManager || staffRole === 'KITCHEN_CHEF' || staffRole === 'HEAD_CHEF' || staffRole === 'LINE_COOK';
-    const canAccessDispatch = isManager || staffRole === 'STORE_DISPATCHER';
-    const canAccessInventory = isManager || staffRole === 'KITCHEN_CHEF' || staffRole === 'HEAD_CHEF';
+    const canAccessOrderDesk = true;
+    const canAccessChefStation = true;
+    const canAccessDispatch = isManager;
+    const canAccessInventory = isManager;
 
     tabs = [
       { id: 'staff_dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-5 h-5" /> }

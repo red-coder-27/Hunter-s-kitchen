@@ -6,6 +6,15 @@ import { apiService } from '../../services/api';
 import { AppNotification, Address } from '../../types';
 import { DeleteAddressModal } from '../../components/DeleteAddressModal';
 import {
+  validateName,
+  validatePhone,
+  validateEmail,
+  validateAddressDetails,
+  sanitizeTypingPhone,
+  sanitizeTypingName,
+  sanitizeTypingPincode
+} from '../../utils/validation';
+import {
   User,
   MapPin,
   Bell,
@@ -53,6 +62,7 @@ export const CustomerProfile: React.FC = () => {
   const [addrCoordinates, setAddrCoordinates] = useState('');
   const [isLocatingAddr, setIsLocatingAddr] = useState(false);
   const [isSavingAddr, setIsSavingAddr] = useState(false);
+  const [addrError, setAddrError] = useState<string | null>(null);
   const [deletingAddr, setDeletingAddr] = useState<Address | null>(null);
 
   useEffect(() => {
@@ -80,16 +90,23 @@ export const CustomerProfile: React.FC = () => {
 
   const handleSaveProfile = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!editName.trim()) {
-      setSaveError('Name cannot be empty.');
+    
+    // Strict client-side validation & formatting
+    const nameRes = validateName(editName);
+    if (!nameRes.isValid) {
+      setSaveError(nameRes.error || 'Please enter a valid full name.');
       return;
     }
-    if (!editPhone.trim()) {
-      setSaveError('Phone number cannot be empty.');
+
+    const phoneRes = validatePhone(editPhone);
+    if (!phoneRes.isValid) {
+      setSaveError(phoneRes.error || 'Please enter a valid 10-digit mobile number.');
       return;
     }
-    if (!editEmail.trim()) {
-      setSaveError('Email address cannot be empty.');
+
+    const emailRes = validateEmail(editEmail);
+    if (!emailRes.isValid) {
+      setSaveError(emailRes.error || 'Please enter a valid Gmail address.');
       return;
     }
 
@@ -98,9 +115,9 @@ export const CustomerProfile: React.FC = () => {
 
     try {
       await updateUserProfile({
-        name: editName.trim(),
-        phone: editPhone.trim(),
-        email: editEmail.trim()
+        name: nameRes.value,
+        phone: phoneRes.value,
+        email: emailRes.value
       });
       setIsSaving(false);
       setIsEditing(false);
@@ -123,6 +140,7 @@ export const CustomerProfile: React.FC = () => {
     setAddrPincode('641001');
     setAddrType('HOME');
     setAddrCoordinates('');
+    setAddrError(null);
     setIsAddingAddr(true);
   };
 
@@ -136,11 +154,13 @@ export const CustomerProfile: React.FC = () => {
     setAddrPincode(addr.pincode || '641001');
     setAddrType(addr.type || 'HOME');
     setAddrCoordinates(addr.coordinates || '');
+    setAddrError(null);
   };
 
   const handleCancelAddr = () => {
     setEditingAddrId(null);
     setIsAddingAddr(false);
+    setAddrError(null);
   };
 
   const handleDetectAddrLocation = () => {
@@ -174,7 +194,7 @@ export const CustomerProfile: React.FC = () => {
             setAddrStreet(addr.road || addr.pedestrian || addr.cycleway || addr.footway || addr.path || addr.suburb || addr.neighbourhood || 'Main Road');
             setAddrArea(addr.suburb || addr.neighbourhood || addr.city_district || addr.residential || addr.village || addr.quarter || 'Central District');
             setAddrCity(addr.city || addr.town || addr.village || 'Coimbatore');
-            setAddrPincode(addr.postcode || '641001');
+            setAddrPincode((addr.postcode || '641001').replace(/\D/g, '').slice(0, 6));
           }
         } catch (err) {
           console.warn('Reverse geocoding failed:', err);
@@ -192,7 +212,21 @@ export const CustomerProfile: React.FC = () => {
 
   const handleSaveAddrSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!addrStreet.trim() || !addrArea.trim()) return;
+    
+    // Strict Address Validation
+    const validation = validateAddressDetails({
+      street: addrStreet,
+      area: addrArea,
+      pincode: addrPincode,
+      doorNo: addrDoor
+    });
+
+    if (!validation.isValid) {
+      setAddrError(validation.error || 'Please fill in valid address details.');
+      return;
+    }
+
+    setAddrError(null);
     setIsSavingAddr(true);
     try {
       const payload = {
@@ -200,7 +234,7 @@ export const CustomerProfile: React.FC = () => {
         street: addrStreet.trim(),
         area: addrArea.trim(),
         city: addrCity.trim() || 'Coimbatore',
-        pincode: addrPincode.trim() || '641001',
+        pincode: addrPincode.replace(/\D/g, '').slice(0, 6) || '641001',
         type: addrType,
         coordinates: addrCoordinates.trim() || undefined,
         name: currentUser?.name || 'Customer',
@@ -215,9 +249,11 @@ export const CustomerProfile: React.FC = () => {
       setIsSavingAddr(false);
       setEditingAddrId(null);
       setIsAddingAddr(false);
-    } catch (err) {
+      setAddrError(null);
+    } catch (err: any) {
       console.error('Failed to save address:', err);
       setIsSavingAddr(false);
+      setAddrError(err.message || 'Failed to save delivery address.');
     }
   };
 
@@ -291,8 +327,9 @@ export const CustomerProfile: React.FC = () => {
                 <input
                   type="text"
                   value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
+                  onChange={(e) => setEditName(e.target.value.slice(0, 70))}
                   placeholder="Enter full name"
+                  maxLength={70}
                   className="w-full pl-9 pr-3 py-2 bg-stone-50 border border-stone-200 focus:border-red-600 focus:bg-white rounded-xl text-xs font-bold text-stone-900 outline-hidden transition-all"
                 />
               </div>
@@ -305,10 +342,11 @@ export const CustomerProfile: React.FC = () => {
               <div className="relative">
                 <Phone className="w-4 h-4 text-stone-400 absolute left-3 top-2.5 pointer-events-none" />
                 <input
-                  type="text"
+                  type="tel"
                   value={editPhone}
-                  onChange={(e) => setEditPhone(e.target.value)}
-                  placeholder="Enter phone number"
+                  onChange={(e) => setEditPhone(sanitizeTypingPhone(e.target.value))}
+                  placeholder="e.g. 9876543210"
+                  maxLength={10}
                   className="w-full pl-9 pr-3 py-2 bg-stone-50 border border-stone-200 focus:border-red-600 focus:bg-white rounded-xl text-xs font-bold text-stone-900 outline-hidden transition-all"
                 />
               </div>
@@ -462,6 +500,13 @@ export const CustomerProfile: React.FC = () => {
               </button>
             </div>
 
+            {addrError && (
+              <div className="p-2.5 bg-red-50 border border-red-200 text-red-700 text-xs font-semibold rounded-xl flex items-center gap-1.5 animate-in fade-in">
+                <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+                <span>{addrError}</span>
+              </div>
+            )}
+
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="text-[10px] font-extrabold text-stone-600 uppercase block mb-1">Type</label>
@@ -481,7 +526,8 @@ export const CustomerProfile: React.FC = () => {
                   type="text"
                   placeholder="e.g. 12-A"
                   value={addrDoor}
-                  onChange={(e) => setAddrDoor(e.target.value)}
+                  onChange={(e) => setAddrDoor(e.target.value.slice(0, 50))}
+                  maxLength={50}
                   className="w-full p-2 bg-white border border-stone-200 rounded-lg text-xs font-semibold text-stone-900 outline-hidden"
                 />
               </div>
@@ -494,7 +540,8 @@ export const CustomerProfile: React.FC = () => {
                 placeholder="e.g. Avinashi Road"
                 value={addrStreet}
                 required
-                onChange={(e) => setAddrStreet(e.target.value)}
+                maxLength={120}
+                onChange={(e) => setAddrStreet(e.target.value.slice(0, 120))}
                 className="w-full p-2 bg-white border border-stone-200 rounded-lg text-xs font-semibold text-stone-900 outline-hidden"
               />
             </div>
@@ -507,17 +554,19 @@ export const CustomerProfile: React.FC = () => {
                   placeholder="e.g. Peelamedu"
                   value={addrArea}
                   required
-                  onChange={(e) => setAddrArea(e.target.value)}
+                  maxLength={100}
+                  onChange={(e) => setAddrArea(e.target.value.slice(0, 100))}
                   className="w-full p-2 bg-white border border-stone-200 rounded-lg text-xs font-semibold text-stone-900 outline-hidden"
                 />
               </div>
               <div>
-                <label className="text-[10px] font-extrabold text-stone-600 uppercase block mb-1">Pincode</label>
+                <label className="text-[10px] font-extrabold text-stone-600 uppercase block mb-1">Pincode (6 digits)</label>
                 <input
                   type="text"
                   placeholder="e.g. 641004"
                   value={addrPincode}
-                  onChange={(e) => setAddrPincode(e.target.value)}
+                  maxLength={6}
+                  onChange={(e) => setAddrPincode(sanitizeTypingPincode(e.target.value))}
                   className="w-full p-2 bg-white border border-stone-200 rounded-lg text-xs font-semibold text-stone-900 outline-hidden"
                 />
               </div>
@@ -630,62 +679,6 @@ export const CustomerProfile: React.FC = () => {
           setTimeout(() => setSaveSuccessMsg(null), 4000);
         }}
       />
-
-      {/* Notification Preferences & Alerts */}
-      <div className="bg-white rounded-2xl border border-stone-200 p-4 space-y-3.5 shadow-2xs">
-        <h3 className="font-extrabold text-stone-900 text-xs uppercase tracking-wide flex items-center gap-2">
-          <Bell className="w-4 h-4 text-red-600" /> Notification & Alert Preferences
-        </h3>
-
-        <div className="space-y-2.5 text-xs">
-          {/* Web Push */}
-          <div className="p-3 bg-stone-50 rounded-xl border border-stone-200 flex items-center justify-between gap-3">
-            <div>
-              <span className="font-bold text-stone-900 block">Instant Order Push Alerts</span>
-              <span className="text-[11px] text-stone-500">Live desktop/mobile alerts when kitchen accepts or dispatches your food</span>
-            </div>
-            <button
-              type="button"
-              onClick={async () => {
-                if (webPushPermission !== 'granted') {
-                  await requestWebPushPermission();
-                } else {
-                  togglePushAlerts();
-                }
-              }}
-              className={`px-3 py-1.5 rounded-lg font-bold text-xs cursor-pointer transition-colors ${
-                webPushPermission === 'granted' && isPushAlertsEnabled
-                  ? 'bg-emerald-600 text-white'
-                  : 'bg-stone-200 text-stone-700 hover:bg-stone-300'
-              }`}
-            >
-              {webPushPermission === 'granted' && isPushAlertsEnabled ? 'Enabled' : 'Enable'}
-            </button>
-          </div>
-
-          {/* SMS / WhatsApp Updates */}
-          <div className="p-3 bg-stone-50 rounded-xl border border-stone-200 flex items-center justify-between gap-3">
-            <div>
-              <span className="font-bold text-stone-900 block">SMS & WhatsApp Delivery Alerts</span>
-              <span className="text-[11px] text-stone-500">Receive rider assignment & OTP alerts on {currentUser?.phone}</span>
-            </div>
-            <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 font-extrabold rounded-lg text-[10px]">
-              Active
-            </span>
-          </div>
-
-          {/* Email Receipts */}
-          <div className="p-3 bg-stone-50 rounded-xl border border-stone-200 flex items-center justify-between gap-3">
-            <div>
-              <span className="font-bold text-stone-900 block">Email Invoices & GST Receipts</span>
-              <span className="text-[11px] text-stone-500">Automated order confirmation sent to {currentUser?.email}</span>
-            </div>
-            <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 font-extrabold rounded-lg text-[10px]">
-              Active
-            </span>
-          </div>
-        </div>
-      </div>
 
       {/* Notifications Section */}
       <div className="bg-white rounded-2xl border border-stone-200 p-4 space-y-3 shadow-2xs">

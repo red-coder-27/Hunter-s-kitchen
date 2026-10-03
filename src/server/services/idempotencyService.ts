@@ -1,123 +1,118 @@
-import fs from 'fs';
-import path from 'path';
 import { IdempotencyRecord } from '../models/productionTypes';
 import { IdempotencyConflictError } from '../errors/AppError';
 import { config } from '../config/config';
-
-const DATA_DIR = path.join(process.cwd(), 'data');
-const IDEMPOTENCY_FILE = path.join(DATA_DIR, 'idempotency_store.json');
+import { postgresDb } from '../db/postgres';
+import { logger } from '../utils/logger';
 
 class IdempotencyService {
-  private store = new Map<string, IdempotencyRecord>();
-
   constructor() {
-    this.init();
-
-    // Periodic sweep of expired idempotency keys and periodic persist
+    // Periodic sweep of expired idempotency keys in PostgreSQL
     setInterval(() => {
-      this.sweepExpired();
+      this.sweepExpired().catch((err) => {
+        logger.warn('Failed to sweep expired idempotency records', { error: err.message });
+      });
     }, 60000);
   }
 
-  private init() {
+  private async sweepExpired(): Promise<void> {
     try {
-      if (!fs.existsSync(DATA_DIR)) {
-        fs.mkdirSync(DATA_DIR, { recursive: true });
-      }
-      if (fs.existsSync(IDEMPOTENCY_FILE)) {
-        const raw = fs.readFileSync(IDEMPOTENCY_FILE, 'utf-8');
-        const records: IdempotencyRecord[] = JSON.parse(raw);
-        const now = new Date().toISOString();
-        for (const rec of records) {
-          // Keep unexpired records
-          if (rec.expiresAt > now) {
-            this.store.set(rec.key, rec);
-          }
-        }
-      }
-    } catch (e) {
-      console.warn('Failed to load persistent idempotency records, starting in-memory store');
-    }
-  }
-
-  private persist() {
-    try {
-      if (!fs.existsSync(DATA_DIR)) {
-        fs.mkdirSync(DATA_DIR, { recursive: true });
-      }
-      const records = Array.from(this.store.values());
-      fs.writeFileSync(IDEMPOTENCY_FILE, JSON.stringify(records, null, 2), 'utf-8');
-    } catch (e) {
-      console.error('Failed to persist idempotency store to disk', e);
-    }
-  }
-
-  private sweepExpired() {
-    const now = new Date().toISOString();
-    let changed = false;
-    for (const [key, record] of this.store.entries()) {
-      if (record.expiresAt < now) {
-        this.store.delete(key);
-        changed = true;
-      }
-    }
-    if (changed) {
-      this.persist();
+      await postgresDb.query('DELETE FROM idempotency_records WHERE expires_at < NOW()');
+    } catch (e: any) {
+      logger.warn('Error sweeping expired idempotency records', { error: e.message });
     }
   }
 
   /**
-   * Acquire a lock for this idempotency key.
+   * Acquire a lock for this idempotency key in PostgreSQL.
    * If already completed, returns the cached result.
    * If currently in progress, throws IdempotencyConflictError.
    */
-  startRequest(key: string, path: string, payload: any): { cached: boolean; record?: IdempotencyRecord } {
-    const existing = this.store.get(key);
+  async startRequest(
+    key: string,
+    path: string,
+    payload: any
+  ): Promise<{ cached: boolean; record?: IdempotencyRecord }> {
     const now = new Date();
-    const expiresAt = new Date(now.getTime() + config.idempotencyTtlSeconds * 1000).toISOString();
+    const expiresAt = new Date(now.getTime() + config.idempotencyTtlSeconds * 1000);
+    const requestHash = JSON.stringify(payload || {});
 
-    if (existing) {
-      if (existing.status === 'IN_PROGRESS') {
-        throw new IdempotencyConflictError(key);
+    return postgresDb.transaction(async (client) => {
+      const existingRes = await client.query(
+        'SELECT * FROM idempotency_records WHERE key = $1 FOR UPDATE',
+        [key]
+      );
+
+      if (existingRes.rows.length > 0) {
+        const existing = this.rowToRecord(existingRes.rows[0]);
+        const isExpired = new Date(existing.expiresAt).getTime() <= now.getTime();
+
+        if (!isExpired) {
+          if (existing.status === 'IN_PROGRESS') {
+            throw new IdempotencyConflictError(key);
+          }
+          if (existing.status === 'COMPLETED') {
+            return { cached: true, record: existing };
+          }
+        }
       }
-      if (existing.status === 'COMPLETED') {
-        return { cached: true, record: existing };
-      }
+
+      await client.query(
+        `INSERT INTO idempotency_records (key, request_path, request_hash, status, created_at, expires_at)
+         VALUES ($1, $2, $3, 'IN_PROGRESS', $4, $5)
+         ON CONFLICT (key) DO UPDATE SET
+           request_path = EXCLUDED.request_path,
+           request_hash = EXCLUDED.request_hash,
+           status = 'IN_PROGRESS',
+           response_status = NULL,
+           response_body = NULL,
+           created_at = EXCLUDED.created_at,
+           expires_at = EXCLUDED.expires_at`,
+        [key, path, requestHash, now, expiresAt]
+      );
+
+      return { cached: false };
+    });
+  }
+
+  /**
+   * Complete the request and store the response in PostgreSQL.
+   */
+  async completeRequest(key: string, statusCode: number, responseBody: any): Promise<void> {
+    try {
+      await postgresDb.query(
+        `UPDATE idempotency_records SET
+          status = 'COMPLETED', response_status = $1, response_body = $2
+        WHERE key = $3`,
+        [statusCode, JSON.stringify(responseBody || null), key]
+      );
+    } catch (e: any) {
+      logger.error('Failed to complete idempotency record in PostgreSQL', { key, error: e.message });
     }
+  }
 
-    const record: IdempotencyRecord = {
-      key,
-      requestPath: path,
-      requestHash: JSON.stringify(payload || {}),
-      status: 'IN_PROGRESS',
-      createdAt: now.toISOString(),
-      expiresAt
+  /**
+   * Mark request as failed so client can retry.
+   */
+  async failRequest(key: string): Promise<void> {
+    try {
+      await postgresDb.query(`DELETE FROM idempotency_records WHERE key = $1`, [key]);
+    } catch (e: any) {
+      logger.error('Failed to reset idempotency record in PostgreSQL', { key, error: e.message });
+    }
+  }
+
+  private rowToRecord(r: any): IdempotencyRecord {
+    const parseJson = (v: any) => (typeof v === 'string' ? JSON.parse(v) : v);
+    return {
+      key: r.key,
+      requestPath: r.request_path,
+      requestHash: r.request_hash,
+      status: r.status,
+      responseStatus: r.response_status ? Number(r.response_status) : undefined,
+      responseBody: parseJson(r.response_body),
+      createdAt: r.created_at ? new Date(r.created_at).toISOString() : new Date().toISOString(),
+      expiresAt: r.expires_at ? new Date(r.expires_at).toISOString() : new Date().toISOString()
     };
-
-    this.store.set(key, record);
-    this.persist();
-    return { cached: false };
-  }
-
-  /**
-   * Complete the idempotent request and store the HTTP response.
-   */
-  completeRequest(key: string, statusCode: number, responseBody: any): void {
-    const record = this.store.get(key);
-    if (record) {
-      record.status = 'COMPLETED';
-      record.responseStatus = statusCode;
-      record.responseBody = responseBody;
-      this.persist();
-    }
-  }
-
-  /**
-   * Mark as failed so client can retry with same key.
-   */
-  failRequest(key: string): void {
-    this.store.delete(key);
-    this.persist();
   }
 }
 

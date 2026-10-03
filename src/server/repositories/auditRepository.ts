@@ -1,86 +1,11 @@
-import fs from 'fs';
-import path from 'path';
 import crypto from 'crypto';
 import { AuditLogEntry } from '../models/productionTypes';
+import { postgresDb } from '../db/postgres';
+import { logger } from '../utils/logger';
 
-const DATA_DIR = path.join(process.cwd(), 'data');
-const AUDIT_FILE = path.join(DATA_DIR, 'audit_logs.json');
 const GENESIS_HASH = '0'.repeat(64);
 
 class AuditRepository {
-  private logs: AuditLogEntry[] = [];
-
-  constructor() {
-    this.init();
-  }
-
-  private init() {
-    try {
-      if (!fs.existsSync(DATA_DIR)) {
-        fs.mkdirSync(DATA_DIR, { recursive: true });
-      }
-      if (fs.existsSync(AUDIT_FILE)) {
-        const raw = fs.readFileSync(AUDIT_FILE, 'utf-8');
-        this.logs = JSON.parse(raw);
-        // Backfill cryptographic hash chain for any legacy logs missing hashes
-        this.ensureHashChainIntegrityOnBoot();
-      } else {
-        this.logs = [];
-        this.persist();
-      }
-    } catch (e) {
-      console.warn('Failed to load audit logs from file, initializing store');
-      this.logs = [];
-    }
-  }
-
-  /**
-   * Backfills cryptographic hashes for any legacy log entries missing chain fields
-   */
-  private ensureHashChainIntegrityOnBoot() {
-    let prevHash = GENESIS_HASH;
-    let modified = false;
-
-    for (let i = 0; i < this.logs.length; i++) {
-      const entry = this.logs[i];
-      const seq = i + 1;
-      const expectedHash = this.calculateHash(
-        seq,
-        prevHash,
-        entry.action,
-        entry.resource,
-        entry.resourceId,
-        entry.oldValue,
-        entry.newValue,
-        entry.requestId,
-        entry.timestamp
-      );
-
-      if (entry.hash !== expectedHash || entry.sequenceNumber !== seq || entry.previousHash !== prevHash) {
-        entry.sequenceNumber = seq;
-        entry.previousHash = prevHash;
-        entry.hash = expectedHash;
-        modified = true;
-      }
-      prevHash = entry.hash;
-    }
-
-    if (modified) {
-      this.persist();
-    }
-  }
-
-  private persist() {
-    try {
-      if (!fs.existsSync(DATA_DIR)) {
-        fs.mkdirSync(DATA_DIR, { recursive: true });
-      }
-      fs.writeFileSync(AUDIT_FILE, JSON.stringify(this.logs, null, 2), 'utf-8');
-    } catch (e) {
-      console.error('Failed to write audit logs to disk', e);
-    }
-  }
-
   private calculateHash(
     seq: number,
     prevHash: string,
@@ -96,62 +21,101 @@ class AuditRepository {
     return crypto.createHash('sha256').update(payload).digest('hex');
   }
 
-  insert(entryData: Omit<AuditLogEntry, 'sequenceNumber' | 'previousHash' | 'hash'>): AuditLogEntry {
-    const sequenceNumber = this.logs.length + 1;
-    const previousHash = this.logs.length > 0 ? this.logs[this.logs.length - 1].hash : GENESIS_HASH;
+  async insert(entryData: Omit<AuditLogEntry, 'sequenceNumber' | 'previousHash' | 'hash'>): Promise<AuditLogEntry> {
+    try {
+      return await postgresDb.transaction(async (client) => {
+        // Query latest sequence and hash with row lock
+        const lastRowRes = await client.query(
+          'SELECT sequence_number, hash FROM audit_logs ORDER BY sequence_number DESC LIMIT 1 FOR UPDATE'
+        );
 
-    const hash = this.calculateHash(
-      sequenceNumber,
-      previousHash,
-      entryData.action,
-      entryData.resource,
-      entryData.resourceId,
-      entryData.oldValue,
-      entryData.newValue,
-      entryData.requestId,
-      entryData.timestamp
-    );
+        const lastRow = lastRowRes.rows[0];
+        const sequenceNumber = lastRow ? Number(lastRow.sequence_number) + 1 : 1;
+        const previousHash = lastRow ? lastRow.hash : GENESIS_HASH;
 
-    const fullEntry: AuditLogEntry = {
-      sequenceNumber,
-      ...entryData,
-      previousHash,
-      hash
-    };
+        const hash = this.calculateHash(
+          sequenceNumber,
+          previousHash,
+          entryData.action,
+          entryData.resource,
+          entryData.resourceId,
+          entryData.oldValue,
+          entryData.newValue,
+          entryData.requestId,
+          entryData.timestamp
+        );
 
-    this.logs.push(fullEntry);
+        const fullEntry: AuditLogEntry = {
+          sequenceNumber,
+          ...entryData,
+          previousHash,
+          hash
+        };
 
-    // Keep up to 10,000 persistent audit records
-    if (this.logs.length > 10000) {
-      this.logs = this.logs.slice(-10000);
+        await client.query(
+          `INSERT INTO audit_logs (
+            sequence_number, id, actor_id, actor_name, actor_role, action, resource,
+            resource_id, old_value, new_value, request_id, ip_address, timestamp,
+            previous_hash, hash
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)`,
+          [
+            sequenceNumber,
+            fullEntry.id,
+            fullEntry.actorId,
+            fullEntry.actorName,
+            fullEntry.actorRole,
+            fullEntry.action,
+            fullEntry.resource,
+            fullEntry.resourceId,
+            JSON.stringify(fullEntry.oldValue || null),
+            JSON.stringify(fullEntry.newValue || null),
+            fullEntry.requestId,
+            fullEntry.ipAddress || null,
+            fullEntry.timestamp || new Date().toISOString(),
+            previousHash,
+            hash
+          ]
+        );
+
+        return fullEntry;
+      });
+    } catch (e: any) {
+      logger.error('Failed to insert audit log into PostgreSQL', { error: e.message });
+      throw e;
     }
-    this.persist();
-
-    return fullEntry;
   }
 
-  getAll(limit: number = 100): AuditLogEntry[] {
-    // Return newest first for UI and API consumers
-    return [...this.logs].reverse().slice(0, limit);
+  async getAll(limit: number = 100): Promise<AuditLogEntry[]> {
+    const res = await postgresDb.query(
+      'SELECT * FROM audit_logs ORDER BY sequence_number DESC LIMIT $1',
+      [limit]
+    );
+    return res.rows.map(this.rowToEntry);
   }
 
-  findByResourceId(resourceId: string): AuditLogEntry[] {
-    return this.logs.filter((l) => l.resourceId === resourceId);
+  async findByResourceId(resourceId: string): Promise<AuditLogEntry[]> {
+    const res = await postgresDb.query(
+      'SELECT * FROM audit_logs WHERE resource_id = $1 ORDER BY sequence_number ASC',
+      [resourceId]
+    );
+    return res.rows.map(this.rowToEntry);
   }
 
   /**
-   * Cryptographically verifies the SHA-256 hash chain of the entire audit trail.
-   * Detects any altered data, deleted rows, or injection tampering.
+   * Cryptographically verifies the SHA-256 hash chain of the entire audit trail stored in PostgreSQL.
    */
-  verifyIntegrity(): {
+  async verifyIntegrity(): Promise<{
     isValid: boolean;
     checkedCount: number;
     genesisHash: string;
     latestHash: string;
     brokenAt?: number;
     error?: string;
-  } {
-    if (this.logs.length === 0) {
+  }> {
+    const res = await postgresDb.query('SELECT * FROM audit_logs ORDER BY sequence_number ASC');
+    const logs = res.rows.map(this.rowToEntry);
+
+    if (logs.length === 0) {
       return {
         isValid: true,
         checkedCount: 0,
@@ -162,8 +126,8 @@ class AuditRepository {
 
     let expectedPreviousHash = GENESIS_HASH;
 
-    for (let i = 0; i < this.logs.length; i++) {
-      const entry = this.logs[i];
+    for (let i = 0; i < logs.length; i++) {
+      const entry = logs[i];
 
       // 1. Verify previous hash pointer
       if (entry.previousHash !== expectedPreviousHash) {
@@ -206,9 +170,30 @@ class AuditRepository {
 
     return {
       isValid: true,
-      checkedCount: this.logs.length,
+      checkedCount: logs.length,
       genesisHash: GENESIS_HASH,
-      latestHash: this.logs[this.logs.length - 1].hash
+      latestHash: logs[logs.length - 1].hash
+    };
+  }
+
+  private rowToEntry(r: any): AuditLogEntry {
+    const parseJson = (v: any) => (typeof v === 'string' ? JSON.parse(v) : v);
+    return {
+      sequenceNumber: Number(r.sequence_number),
+      id: r.id,
+      actorId: r.actor_id,
+      actorName: r.actor_name,
+      actorRole: r.actor_role,
+      action: r.action,
+      resource: r.resource,
+      resourceId: r.resource_id,
+      oldValue: parseJson(r.old_value),
+      newValue: parseJson(r.new_value),
+      requestId: r.request_id,
+      ipAddress: r.ip_address || undefined,
+      timestamp: r.timestamp ? new Date(r.timestamp).toISOString() : new Date().toISOString(),
+      previousHash: r.previous_hash,
+      hash: r.hash
     };
   }
 }

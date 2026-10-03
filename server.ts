@@ -27,9 +27,13 @@ import {
   requireRole,
   requirePermission,
   csrfProtection,
-  extractToken
+  extractToken,
+  SESSION_COOKIE_NAME,
+  getSessionCookieOptions,
+  getClearCookieOptions
 } from './src/server/middleware/auth';
 
+import { postgresDb } from './src/server/db/postgres';
 import { db } from './src/server/db';
 import { authService } from './src/server/services/authService';
 import { orderService } from './src/server/services/orderService';
@@ -41,6 +45,13 @@ import { eventHub } from './src/server/services/eventHub';
 import { cacheService } from './src/server/services/cacheService';
 import { redisService } from './src/server/services/redisService';
 import { emailService } from './src/server/services/emailService';
+import {
+  validateAndSanitizeName,
+  validateAndSanitizePhone,
+  validateAndSanitizeEmail,
+  validateAndSanitizePassword,
+  validateAndSanitizeAddress
+} from './src/server/utils/sanitizer';
 
 import { User, UserRole } from './src/types';
 import { ValidationError, UnauthorizedError, ForbiddenError, NotFoundError } from './src/server/errors/AppError';
@@ -48,6 +59,9 @@ import { ValidationError, UnauthorizedError, ForbiddenError, NotFoundError } fro
 async function startServer() {
   const app = express();
   const PORT = config.port;
+
+  // Initialize PostgreSQL Primary Connection Pool & Verification
+  await postgresDb.initialize();
 
   // Configure reverse proxy / load balancer IP forwarding
   app.set('trust proxy', true);
@@ -72,7 +86,7 @@ async function startServer() {
   app.use(csrfProtection);
 
   // 2. REAL-TIME SERVER-SENT EVENTS (SSE) ENDPOINT
-  app.get('/api/events/stream', (req: Request, res: Response) => {
+  app.get('/api/events/stream', async (req: Request, res: Response) => {
     // Connection limiter check (max 5 active streams per IP)
     if (!sseConnectionTracker(req, res)) {
       return res.status(429).json({
@@ -90,7 +104,7 @@ async function startServer() {
     if (token) {
       try {
         const payload = authService.verifyToken(token);
-        user = db.getUserById(payload.userId);
+        user = await db.getUserById(payload.userId);
       } catch {
         // Invalid token; stream connects unauthenticated
       }
@@ -115,40 +129,55 @@ async function startServer() {
     });
   });
 
-  // 3. HEALTH & METRICS CHECK
-  app.get('/api/health', (req: Request, res: Response) => {
+  // 3. HEALTH & METRICS CHECK (PostgreSQL + Redis + App State)
+  app.get('/api/health', async (req: Request, res: Response) => {
+    const dbHealth = await postgresDb.healthCheck();
     res.json({
-      status: 'ok',
+      status: dbHealth.ok ? 'ok' : 'degraded',
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
       memoryUsage: process.memoryUsage(),
-      activeSSEClients: eventHub.getClientCount()
+      activeSSEClients: eventHub.getClientCount(),
+      database: {
+        engine: 'PostgreSQL 18.x',
+        status: dbHealth.ok ? 'HEALTHY' : 'UNHEALTHY',
+        latencyMs: dbHealth.latencyMs,
+        pool: dbHealth.pool,
+        error: dbHealth.error
+      },
+      redis: {
+        status: 'HEALTHY'
+      }
     });
   });
 
   // 4. RESTAURANT SETTINGS (Public Read, Owner Write)
-  app.get('/api/settings', (req: Request, res: Response) => {
-    const cached = cacheService.get('settings');
-    if (cached) {
-      return res.json({ success: true, data: cached });
+  app.get('/api/settings', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const cached = cacheService.get('settings');
+      if (cached) {
+        return res.json({ success: true, data: cached });
+      }
+      const settings = await db.getSettings();
+      cacheService.set('settings', settings, 300, ['settings']);
+      res.json({ success: true, data: settings });
+    } catch (err) {
+      next(err);
     }
-    const settings = db.getSettings();
-    cacheService.set('settings', settings, 300, ['settings']);
-    res.json({ success: true, data: settings });
   });
 
   app.patch(
     '/api/owner/settings',
     requireAuth,
     requireRole('OWNER'),
-    (req: Request, res: Response, next: NextFunction) => {
+    async (req: Request, res: Response, next: NextFunction) => {
       try {
-        const oldSettings = db.getSettings();
-        const updated = db.updateSettings(req.body);
+        const oldSettings = await db.getSettings();
+        const updated = await db.updateSettings(req.body);
 
         cacheService.invalidateTag('settings');
 
-        auditService.log({
+        await auditService.log({
           actorId: req.user!.id,
           actorName: req.user!.name,
           actorRole: req.user!.role,
@@ -181,13 +210,7 @@ async function startServer() {
       );
 
       // Set secure HTTP-only session cookie
-      const isProd = process.env.NODE_ENV === 'production';
-      res.cookie('hk_session', result.token, {
-        httpOnly: true,
-        secure: isProd,
-        sameSite: isProd ? 'none' : 'lax',
-        maxAge: 24 * 60 * 60 * 1000
-      });
+      res.cookie(SESSION_COOKIE_NAME, result.token, getSessionCookieOptions());
 
       res.json({
         success: true,
@@ -207,14 +230,8 @@ async function startServer() {
         userAgent: req.headers['user-agent']
       });
 
-      // Set secure HTTP-only session cookie (support cross-site iframes with sameSite: none in production)
-      const isProd = process.env.NODE_ENV === 'production';
-      res.cookie('hk_session', result.token, {
-        httpOnly: true,
-        secure: isProd,
-        sameSite: isProd ? 'none' : 'lax',
-        maxAge: 24 * 60 * 60 * 1000
-      });
+      // Set secure HTTP-only session cookie
+      res.cookie(SESSION_COOKIE_NAME, result.token, getSessionCookieOptions());
 
       res.json({
         success: true,
@@ -238,18 +255,13 @@ async function startServer() {
     });
   });
 
-  app.post('/api/auth/logout', optionalAuth, (req: Request, res: Response) => {
-    authService.logout(req.authToken, req.user, {
+  app.post('/api/auth/logout', optionalAuth, async (req: Request, res: Response) => {
+    await authService.logout(req.authToken, req.user, {
       ip: req.ip || '',
       requestId: req.requestId
     });
 
-    const isProd = process.env.NODE_ENV === 'production';
-    res.clearCookie('hk_session', {
-      httpOnly: true,
-      secure: isProd,
-      sameSite: isProd ? 'none' : 'lax'
-    });
+    res.clearCookie(SESSION_COOKIE_NAME, getClearCookieOptions());
 
     res.json({ success: true, message: 'Logged out successfully' });
   });
@@ -279,13 +291,7 @@ async function startServer() {
       });
 
       // Set secure HTTP-only session cookie
-      const isProd = process.env.NODE_ENV === 'production';
-      res.cookie('hk_session', result.token, {
-        httpOnly: true,
-        secure: isProd,
-        sameSite: isProd ? 'none' : 'lax',
-        maxAge: 24 * 60 * 60 * 1000
-      });
+      res.cookie(SESSION_COOKIE_NAME, result.token, getSessionCookieOptions());
 
       res.json({
         success: true,
@@ -335,11 +341,9 @@ async function startServer() {
       });
     }
 
-    // Generate cryptographically secure state (CSRF protection) and nonce (OIDC replay protection)
     const state = crypto.randomBytes(32).toString('hex');
     const nonce = crypto.randomBytes(32).toString('hex');
 
-    // Store OAuth transaction server-side in Redis/memory with 10-minute TTL
     const txData = {
       nonce,
       redirectUri: config.googleRedirectUri,
@@ -347,7 +351,6 @@ async function startServer() {
     };
     await redisService.set(`oauth_state:${state}`, JSON.stringify(txData), 600);
 
-    // Set HttpOnly, SameSite=Lax cookie with state token
     const isProd = config.env === 'production';
     res.cookie('hk_oauth_state', state, {
       httpOnly: true,
@@ -380,7 +383,6 @@ async function startServer() {
     const isProd = config.env === 'production';
     const targetOrigin = config.appOrigin;
 
-    // Helper to render popup callback HTML with origin-restricted postMessage (NO application JWT in postMessage)
     const renderCallbackHtml = (status: 'SUCCESS' | 'ERROR', user?: any, errorMsg?: string) => {
       res.clearCookie('hk_oauth_state', { httpOnly: true, secure: isProd, sameSite: 'lax', path: '/' });
       const safeUserJson = user ? JSON.stringify(user) : 'null';
@@ -427,7 +429,6 @@ async function startServer() {
                   }
                   setTimeout(function() { window.close(); }, 800);
                 } else {
-                  // Fallback for full-tab redirection
                   setTimeout(function() { window.location.href = '/'; }, 1200);
                 }
               })();
@@ -437,7 +438,6 @@ async function startServer() {
       `;
     };
 
-    // 1. Check for Google OAuth error in query (e.g. access_denied when user cancels)
     if (req.query.error) {
       const googleError = String(req.query.error_description || req.query.error);
       logger.warn(`[OAuth] Google returned error: ${googleError}`);
@@ -448,13 +448,11 @@ async function startServer() {
     const incomingState = req.query.state as string | undefined;
     const cookieState = req.cookies.hk_oauth_state as string | undefined;
 
-    // 2. Validate state against cookie (CSRF check)
     if (!incomingState || !cookieState || incomingState !== cookieState) {
       logger.warn('[OAuth] State mismatch or missing state cookie (potential CSRF).');
       return res.status(403).send(renderCallbackHtml('ERROR', undefined, 'Invalid or expired state session (CSRF protection).'));
     }
 
-    // 3. Fetch and validate server-side transaction from Redis / memory
     const rawTx = await redisService.get(`oauth_state:${incomingState}`);
     if (!rawTx) {
       return res.status(403).send(renderCallbackHtml('ERROR', undefined, 'OAuth transaction expired. Please try again.'));
@@ -477,7 +475,6 @@ async function startServer() {
     }
 
     try {
-      // 4. Exchange authorization code with Google token endpoint
       const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -497,7 +494,6 @@ async function startServer() {
         return res.status(400).send(renderCallbackHtml('ERROR', undefined, `Google token error: ${errDetail}`));
       }
 
-      // 5. Cryptographically verify ID Token using Google OAuth2Client
       const oauthClient = new OAuth2Client(config.googleClientId);
       const ticket = await oauthClient.verifyIdToken({
         idToken: tokenData.id_token,
@@ -509,7 +505,6 @@ async function startServer() {
         throw new UnauthorizedError('Failed to decode verified Google ID Token payload');
       }
 
-      // Explicit OIDC claims verification
       if (payload.iss !== 'accounts.google.com' && payload.iss !== 'https://accounts.google.com') {
         throw new UnauthorizedError(`Invalid token issuer: ${payload.iss}`);
       }
@@ -526,7 +521,6 @@ async function startServer() {
         throw new UnauthorizedError('Missing Google subject identifier (sub)');
       }
 
-      // 6. Authoritative account lookup and session creation in authService
       const sessionResult = await authService.loginWithVerifiedGoogle(
         {
           sub: payload.sub,
@@ -542,16 +536,7 @@ async function startServer() {
         }
       );
 
-      // 7. Set secure HttpOnly session cookie (SameSite=Lax, Path=/)
-      res.cookie('hk_session', sessionResult.token, {
-        httpOnly: true,
-        secure: isProd,
-        sameSite: 'lax',
-        maxAge: 24 * 60 * 60 * 1000,
-        path: '/'
-      });
-
-      // 8. Render callback HTML posting success (no JWT exposed in message payload)
+      res.cookie(SESSION_COOKIE_NAME, sessionResult.token, getSessionCookieOptions());
       return res.send(renderCallbackHtml('SUCCESS', sessionResult.user));
     } catch (err: any) {
       logger.error(`[OAuth] Google authentication exception: ${err.message}`);
@@ -559,10 +544,9 @@ async function startServer() {
     }
   });
 
-
   // INFRASTRUCTURE & ARCHITECTURAL SECURITY STATUS
-  app.get('/api/infra/status', (req: Request, res: Response) => {
-    const memory = process.memoryUsage();
+  app.get('/api/infra/status', async (req: Request, res: Response) => {
+    const dbHealth = await postgresDb.healthCheck();
     res.json({
       success: true,
       timestamp: new Date().toISOString(),
@@ -575,6 +559,12 @@ async function startServer() {
         instanceId: `node_worker_${process.pid}_${process.arch}`,
         uptimeSeconds: Math.floor(process.uptime()),
         healthStatus: 'HEALTHY'
+      },
+      database: {
+        engine: 'PostgreSQL 18.x (Relational Source of Truth)',
+        status: dbHealth.ok ? 'HEALTHY' : 'DEGRADED',
+        latencyMs: dbHealth.latencyMs,
+        pool: dbHealth.pool
       },
       redisCache: redisService.getStats(),
       rateLimiting: getRateLimitMetrics(),
@@ -598,10 +588,10 @@ async function startServer() {
     });
   });
 
-  app.post('/api/auth/forgot-password', (req: Request, res: Response, next: NextFunction) => {
+  app.post('/api/auth/forgot-password', async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { email } = req.body;
-      const result = authService.forgotPassword(email, {
+      const result = await authService.forgotPassword(email, {
         ip: req.ip || '',
         requestId: req.requestId
       });
@@ -638,68 +628,91 @@ async function startServer() {
   });
 
   // 6. USERS & STAFF MANAGEMENT (Protected by Role/Permissions)
-  app.get('/api/users', requireAuth, requireRole('OWNER', 'STAFF'), (req: Request, res: Response) => {
-    const role = req.query.role as UserRole | undefined;
-    let users = db.getUsers();
-    if (role) {
-      users = users.filter((u) => u.role === role);
+  app.get('/api/users', requireAuth, requireRole('OWNER', 'STAFF'), async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const role = req.query.role as UserRole | undefined;
+      let users = await db.getUsers();
+      if (role) {
+        users = users.filter((u) => u.role === role);
+      }
+      res.json({ success: true, data: users.map((u) => authService.sanitizeUser(u)) });
+    } catch (err) {
+      next(err);
     }
-    res.json({ success: true, data: users.map((u) => authService.sanitizeUser(u)) });
   });
 
   app.patch('/api/users/:id', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
     try {
       const id = req.params.id;
-      // Allow users to update their own profile, or Owner to update any profile
       if (req.user!.id !== id && req.user!.role !== 'OWNER') {
         throw new ForbiddenError('Access denied: You can only update your own user profile');
       }
 
-      const currentUser = db.getUserById(id);
+      const currentUser = await db.getUserById(id);
       if (!currentUser) {
         throw new NotFoundError('User', id);
       }
 
       const { name, phone, email, password, otp } = req.body;
+      const updates: Partial<User> = {};
+
+      if (name !== undefined && name !== null) {
+        const nameRes = validateAndSanitizeName(name);
+        if (!nameRes.isValid) {
+          throw new ValidationError(nameRes.error || 'Invalid full name provided.');
+        }
+        updates.name = nameRes.value;
+      }
+
+      if (phone !== undefined && phone !== null) {
+        const phoneRes = validateAndSanitizePhone(phone);
+        if (!phoneRes.isValid) {
+          throw new ValidationError(phoneRes.error || 'Invalid phone number provided.');
+        }
+        updates.phone = phoneRes.value;
+      }
+
       const isEmailChanging = Boolean(email && email.trim().toLowerCase() !== currentUser.email.toLowerCase());
 
       if (isEmailChanging) {
-        const normalizedNewEmail = email.trim().toLowerCase();
+        const emailRes = validateAndSanitizeEmail(email);
+        if (!emailRes.isValid) {
+          throw new ValidationError(emailRes.error || 'Invalid email address provided.');
+        }
+        const normalizedNewEmail = emailRes.value;
 
-        // Check if new email is already registered to someone else
-        const existing = db.getUserByEmail(normalizedNewEmail);
+        const existing = await db.getUserByEmail(normalizedNewEmail);
         if (existing && existing.id !== id) {
           throw new ValidationError('This Gmail address is already registered to another account.');
         }
 
-        // OTP verification through Gmail is mandatory to save email change
         if (!otp || !String(otp).trim()) {
           throw new ValidationError('Gmail verification code (OTP) is mandatory to confirm and save your changed email address.');
         }
 
-        const isOtpValid = await emailService.verifyOtp(normalizedNewEmail, String(otp).trim(), 'EMAIL_CHANGE');
-        if (!isOtpValid) {
-          throw new ValidationError('Invalid or expired 6-digit verification code. Please check your Gmail or request a new code.');
+        const verification = await emailService.verifyOtpDetailed(normalizedNewEmail, String(otp).trim(), 'EMAIL_CHANGE');
+        if (!verification.valid) {
+          throw new ValidationError(verification.message || 'Invalid or expired 6-digit verification code. Please check your Gmail or request a new code.');
         }
+
+        updates.email = normalizedNewEmail;
       }
 
-      const updates: Partial<User> = {};
-      if (name) updates.name = name.trim();
-      if (phone) updates.phone = phone.trim();
-      if (isEmailChanging) updates.email = email.trim().toLowerCase();
-
-      const updated = db.updateUser(id, updates);
+      const updated = await db.updateUser(id, updates);
       if (!updated) {
         throw new NotFoundError('User', id);
       }
 
-      // If password provided (for changed Gmail or profile update), update authentication credentials
-      if (password && String(password).trim().length >= 6) {
-        const hash = bcrypt.hashSync(String(password).trim(), 10);
-        db.updatePassword(id, hash);
+      if (password) {
+        const passRes = validateAndSanitizePassword(password);
+        if (!passRes.isValid) {
+          throw new ValidationError(passRes.error || 'Invalid password provided.');
+        }
+        const hash = bcrypt.hashSync(passRes.value, 10);
+        await db.updatePassword(id, hash);
       }
 
-      auditService.log({
+      await auditService.log({
         actorId: req.user!.id,
         actorName: req.user!.name,
         actorRole: req.user!.role,
@@ -709,7 +722,6 @@ async function startServer() {
         requestId: (req as any).id || `req_${Date.now()}`
       });
 
-      // Issue refreshed JWT token containing updated email/credentials
       const { token: newToken } = authService.generateToken(updated);
 
       res.json({
@@ -729,35 +741,42 @@ async function startServer() {
     '/api/owner/staff',
     requireAuth,
     requireRole('OWNER'),
-    (req: Request, res: Response, next: NextFunction) => {
+    async (req: Request, res: Response, next: NextFunction) => {
       try {
         const { name, email, phone, role, staffRole, password } = req.body;
-        if (!name || !email || !phone) {
-          throw new ValidationError('Name, email, and phone are required');
-        }
-        const existing = db.getUserByEmail(email);
+        
+        const nameRes = validateAndSanitizeName(name);
+        if (!nameRes.isValid) throw new ValidationError(nameRes.error || 'Invalid name provided.');
+
+        const emailRes = validateAndSanitizeEmail(email);
+        if (!emailRes.isValid) throw new ValidationError(emailRes.error || 'Invalid email address provided.');
+
+        const phoneRes = validateAndSanitizePhone(phone);
+        if (!phoneRes.isValid) throw new ValidationError(phoneRes.error || 'Invalid phone number provided.');
+
+        const existing = await db.getUserByEmail(emailRes.value);
         if (existing) {
           throw new ValidationError('Email is already registered');
         }
 
-        const newStaff = db.createUser({
-          name,
-          email,
-          phone,
+        const newStaff = await db.createUser({
+          name: nameRes.value,
+          email: emailRes.value,
+          phone: phoneRes.value,
           role: role || 'STAFF',
           staffRole: staffRole || 'KITCHEN_MANAGER',
           status: 'ACTIVE',
           password: password || 'Hunter@2026!'
         });
 
-        auditService.log({
+        await auditService.log({
           actorId: req.user!.id,
           actorName: req.user!.name,
           actorRole: req.user!.role,
           action: 'CREATE_STAFF_MEMBER',
           resource: 'USER',
           resourceId: newStaff.id,
-          newValue: { name, email, role: newStaff.role, staffRole: newStaff.staffRole },
+          newValue: { name: nameRes.value, email: emailRes.value, role: newStaff.role, staffRole: newStaff.staffRole },
           requestId: req.requestId
         });
 
@@ -773,16 +792,80 @@ async function startServer() {
   );
 
   app.patch(
+    '/api/owner/staff/:id',
+    requireAuth,
+    requireRole('OWNER'),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const { name, email, phone, staffRole, status } = req.body;
+        const updates: Partial<User> = {};
+
+        if (name !== undefined) {
+          const nameRes = validateAndSanitizeName(name);
+          if (!nameRes.isValid) throw new ValidationError(nameRes.error || 'Invalid name provided.');
+          updates.name = nameRes.value;
+        }
+
+        if (email !== undefined) {
+          const emailRes = validateAndSanitizeEmail(email);
+          if (!emailRes.isValid) throw new ValidationError(emailRes.error || 'Invalid email address provided.');
+          const existing = await db.getUserByEmail(emailRes.value);
+          if (existing && existing.id !== req.params.id) {
+            throw new ValidationError('Email is already registered by another account');
+          }
+          updates.email = emailRes.value;
+        }
+
+        if (phone !== undefined) {
+          const phoneRes = validateAndSanitizePhone(phone);
+          if (!phoneRes.isValid) throw new ValidationError(phoneRes.error || 'Invalid phone number provided.');
+          updates.phone = phoneRes.value;
+        }
+
+        if (staffRole !== undefined) {
+          updates.staffRole = staffRole;
+        }
+
+        if (status !== undefined) {
+          updates.status = status;
+        }
+
+        const updated = await db.updateUser(req.params.id, updates);
+        if (!updated) throw new NotFoundError('Staff member', req.params.id);
+
+        await auditService.log({
+          actorId: req.user!.id,
+          actorName: req.user!.name,
+          actorRole: req.user!.role,
+          action: 'UPDATE_STAFF_MEMBER',
+          resource: 'USER',
+          resourceId: req.params.id,
+          newValue: updates,
+          requestId: req.requestId
+        });
+
+        res.json({
+          success: true,
+          data: authService.sanitizeUser(updated),
+          message: 'Staff member updated successfully'
+        });
+      } catch (err) {
+        next(err);
+      }
+    }
+  );
+
+  app.patch(
     '/api/owner/staff/:id/role',
     requireAuth,
     requireRole('OWNER'),
-    (req: Request, res: Response, next: NextFunction) => {
+    async (req: Request, res: Response, next: NextFunction) => {
       try {
         const { staffRole } = req.body;
-        const updated = db.updateUser(req.params.id, { staffRole });
+        const updated = await db.updateUser(req.params.id, { staffRole });
         if (!updated) throw new NotFoundError('Staff member', req.params.id);
 
-        auditService.log({
+        await auditService.log({
           actorId: req.user!.id,
           actorName: req.user!.name,
           actorRole: req.user!.role,
@@ -804,16 +887,16 @@ async function startServer() {
     '/api/owner/staff/:id',
     requireAuth,
     requireRole('OWNER'),
-    (req: Request, res: Response, next: NextFunction) => {
+    async (req: Request, res: Response, next: NextFunction) => {
       try {
         const id = req.params.id;
         if (id === req.user!.id) {
           throw new ValidationError('Cannot delete your own account');
         }
-        const success = db.deleteUser(id);
+        const success = await db.deleteUser(id);
         if (!success) throw new NotFoundError('Staff member', id);
 
-        auditService.log({
+        await auditService.log({
           actorId: req.user!.id,
           actorName: req.user!.name,
           actorRole: req.user!.role,
@@ -834,17 +917,28 @@ async function startServer() {
     '/api/owner/delivery-partners',
     requireAuth,
     requireRole('OWNER'),
-    (req: Request, res: Response, next: NextFunction) => {
+    async (req: Request, res: Response, next: NextFunction) => {
       try {
         const { name, email, phone, vehicleNumber, vehicleType, password } = req.body;
-        if (!name || !email || !phone) {
-          throw new ValidationError('Name, email, and phone are required');
+        
+        const nameRes = validateAndSanitizeName(name);
+        if (!nameRes.isValid) throw new ValidationError(nameRes.error || 'Invalid name provided.');
+
+        const emailRes = validateAndSanitizeEmail(email);
+        if (!emailRes.isValid) throw new ValidationError(emailRes.error || 'Invalid email address provided.');
+
+        const phoneRes = validateAndSanitizePhone(phone);
+        if (!phoneRes.isValid) throw new ValidationError(phoneRes.error || 'Invalid phone number provided.');
+
+        const existing = await db.getUserByEmail(emailRes.value);
+        if (existing) {
+          throw new ValidationError('Email is already registered');
         }
 
-        const newPartner = db.createUser({
-          name,
-          email,
-          phone,
+        const newPartner = await db.createUser({
+          name: nameRes.value,
+          email: emailRes.value,
+          phone: phoneRes.value,
           role: 'DELIVERY_PARTNER',
           status: 'ACTIVE',
           vehicleNumber: vehicleNumber || 'TN-37-XX-9999',
@@ -866,16 +960,148 @@ async function startServer() {
   );
 
   app.patch(
+    '/api/owner/delivery-partners/:id',
+    requireAuth,
+    requireRole('OWNER'),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const { name, email, phone, vehicleNumber, vehicleType, status, partnerStatus } = req.body;
+        const updates: Partial<User> = {};
+
+        if (name !== undefined) {
+          const nameRes = validateAndSanitizeName(name);
+          if (!nameRes.isValid) throw new ValidationError(nameRes.error || 'Invalid name provided.');
+          updates.name = nameRes.value;
+        }
+
+        if (email !== undefined) {
+          const emailRes = validateAndSanitizeEmail(email);
+          if (!emailRes.isValid) throw new ValidationError(emailRes.error || 'Invalid email address provided.');
+          const existing = await db.getUserByEmail(emailRes.value);
+          if (existing && existing.id !== req.params.id) {
+            throw new ValidationError('Email is already registered by another account');
+          }
+          updates.email = emailRes.value;
+        }
+
+        if (phone !== undefined) {
+          const phoneRes = validateAndSanitizePhone(phone);
+          if (!phoneRes.isValid) throw new ValidationError(phoneRes.error || 'Invalid phone number provided.');
+          updates.phone = phoneRes.value;
+        }
+
+        if (vehicleNumber !== undefined) {
+          updates.vehicleNumber = String(vehicleNumber).trim().toUpperCase();
+        }
+
+        if (vehicleType !== undefined) {
+          updates.vehicleType = String(vehicleType).trim();
+        }
+
+        if (status !== undefined) {
+          updates.status = status;
+        }
+
+        if (partnerStatus !== undefined) {
+          updates.partnerStatus = partnerStatus;
+        }
+
+        const updated = await db.updateUser(req.params.id, updates);
+        if (!updated) throw new NotFoundError('Delivery partner', req.params.id);
+
+        await auditService.log({
+          actorId: req.user!.id,
+          actorName: req.user!.name,
+          actorRole: req.user!.role,
+          action: 'UPDATE_DELIVERY_PARTNER',
+          resource: 'USER',
+          resourceId: req.params.id,
+          newValue: updates,
+          requestId: req.requestId
+        });
+
+        res.json({
+          success: true,
+          data: authService.sanitizeUser(updated),
+          message: 'Delivery partner updated successfully'
+        });
+      } catch (err) {
+        next(err);
+      }
+    }
+  );
+
+  app.delete(
+    '/api/owner/delivery-partners/:id',
+    requireAuth,
+    requireRole('OWNER'),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const id = req.params.id;
+        if (id === req.user!.id) {
+          throw new ValidationError('Cannot delete your own account');
+        }
+        const success = await db.deleteUser(id);
+        if (!success) throw new NotFoundError('Delivery partner', id);
+
+        await auditService.log({
+          actorId: req.user!.id,
+          actorName: req.user!.name,
+          actorRole: req.user!.role,
+          action: 'DELETE_DELIVERY_PARTNER',
+          resource: 'USER',
+          resourceId: id,
+          requestId: req.requestId
+        });
+
+        res.json({ success: true, message: 'Delivery partner deleted successfully' });
+      } catch (err) {
+        next(err);
+      }
+    }
+  );
+
+  app.delete(
+    '/api/owner/users/:id',
+    requireAuth,
+    requireRole('OWNER'),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const id = req.params.id;
+        if (id === req.user!.id) {
+          throw new ValidationError('Cannot delete your own account');
+        }
+        const success = await db.deleteUser(id);
+        if (!success) throw new NotFoundError('User', id);
+
+        await auditService.log({
+          actorId: req.user!.id,
+          actorName: req.user!.name,
+          actorRole: req.user!.role,
+          action: 'DELETE_USER',
+          resource: 'USER',
+          resourceId: id,
+          requestId: req.requestId
+        });
+
+        res.json({ success: true, message: 'User deleted successfully' });
+      } catch (err) {
+        next(err);
+      }
+    }
+  );
+
+  app.patch(
     '/api/delivery-partners/:id/status',
     requireAuth,
-    (req: Request, res: Response, next: NextFunction) => {
+    async (req: Request, res: Response, next: NextFunction) => {
       try {
         if (req.user!.role !== 'OWNER' && req.user!.id !== req.params.id) {
           throw new ForbiddenError('Access denied: Cannot update other delivery partner status');
         }
 
         const { status } = req.body;
-        const updated = db.updateUser(req.params.id, { partnerStatus: status });
+        const updated = await db.updateUser(req.params.id, { partnerStatus: status });
         if (!updated) throw new NotFoundError('Partner', req.params.id);
         res.json({ success: true, data: authService.sanitizeUser(updated) });
       } catch (err) {
@@ -885,34 +1111,34 @@ async function startServer() {
   );
 
   // 7. MENU & CATEGORIES (Public Read, Authorized Write)
-  app.get('/api/categories', (req: Request, res: Response) => {
-    const cached = cacheService.get('categories');
-    if (cached) return res.json({ success: true, data: cached });
-
-    const categories = db.getCategories();
-    cacheService.set('categories', categories, 300, ['menu']);
-    res.json({ success: true, data: categories });
+  app.get('/api/categories', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const categories = await db.getCategories();
+      res.json({ success: true, data: categories });
+    } catch (err) {
+      next(err);
+    }
   });
 
-  app.get('/api/menu', (req: Request, res: Response) => {
-    const cached = cacheService.get('menu');
-    if (cached) return res.json({ success: true, data: cached });
-
-    const menu = db.getMenuItems();
-    cacheService.set('menu', menu, 300, ['menu']);
-    res.json({ success: true, data: menu });
+  app.get('/api/menu', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const menu = await db.getMenuItems();
+      res.json({ success: true, data: menu });
+    } catch (err) {
+      next(err);
+    }
   });
 
   app.post(
     '/api/owner/menu-items',
     requireAuth,
     requirePermission('menu.create'),
-    (req: Request, res: Response, next: NextFunction) => {
+    async (req: Request, res: Response, next: NextFunction) => {
       try {
-        const newItem = db.createMenuItem(req.body);
+        const newItem = await db.createMenuItem(req.body);
         cacheService.invalidateTag('menu');
 
-        auditService.log({
+        await auditService.log({
           actorId: req.user!.id,
           actorName: req.user!.name,
           actorRole: req.user!.role,
@@ -934,9 +1160,9 @@ async function startServer() {
     '/api/owner/menu-items/:id',
     requireAuth,
     requirePermission('menu.update'),
-    (req: Request, res: Response, next: NextFunction) => {
+    async (req: Request, res: Response, next: NextFunction) => {
       try {
-        const updated = db.updateMenuItem(req.params.id, req.body);
+        const updated = await db.updateMenuItem(req.params.id, req.body);
         if (!updated) throw new NotFoundError('Menu item', req.params.id);
         cacheService.invalidateTag('menu');
         res.json({ success: true, data: updated });
@@ -950,14 +1176,14 @@ async function startServer() {
     '/api/owner/menu-items/:id/availability',
     requireAuth,
     requirePermission('menu.availability'),
-    (req: Request, res: Response, next: NextFunction) => {
+    async (req: Request, res: Response, next: NextFunction) => {
       try {
         const { isAvailable } = req.body;
-        const updated = db.updateMenuItem(req.params.id, { isAvailable });
+        const updated = await db.updateMenuItem(req.params.id, { isAvailable });
         if (!updated) throw new NotFoundError('Item', req.params.id);
         cacheService.invalidateTag('menu');
 
-        auditService.log({
+        await auditService.log({
           actorId: req.user!.id,
           actorName: req.user!.name,
           actorRole: req.user!.role,
@@ -979,9 +1205,9 @@ async function startServer() {
     '/api/owner/menu-items/:id',
     requireAuth,
     requirePermission('menu.delete'),
-    (req: Request, res: Response, next: NextFunction) => {
+    async (req: Request, res: Response, next: NextFunction) => {
       try {
-        const success = db.deleteMenuItem(req.params.id);
+        const success = await db.deleteMenuItem(req.params.id);
         if (!success) throw new NotFoundError('Item', req.params.id);
         cacheService.invalidateTag('menu');
         res.json({ success: true, message: 'Menu item deleted' });
@@ -992,30 +1218,39 @@ async function startServer() {
   );
 
   // 8. CUSTOMER ADDRESSES (Resource-level Customer Scoping)
-  app.get('/api/addresses/:customerId', requireAuth, (req: Request, res: Response) => {
-    if (req.user!.role === 'CUSTOMER' && req.user!.id !== req.params.customerId) {
-      throw new ForbiddenError('Access denied: Cannot view another customer\'s address book');
+  app.get('/api/addresses/:customerId', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (req.user!.role === 'CUSTOMER' && req.user!.id !== req.params.customerId) {
+        throw new ForbiddenError('Access denied: Cannot view another customer\'s address book');
+      }
+      const addresses = await db.getAddresses(req.params.customerId);
+      res.json({ success: true, data: addresses });
+    } catch (err) {
+      next(err);
     }
-    res.json({ success: true, data: db.getAddresses(req.params.customerId) });
   });
 
-  app.post('/api/addresses/:customerId', requireAuth, (req: Request, res: Response) => {
-    if (req.user!.role === 'CUSTOMER' && req.user!.id !== req.params.customerId) {
-      throw new ForbiddenError('Access denied: Cannot add address to another customer profile');
+  app.post('/api/addresses/:customerId', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (req.user!.role === 'CUSTOMER' && req.user!.id !== req.params.customerId) {
+        throw new ForbiddenError('Access denied: Cannot add address to another customer profile');
+      }
+      const newAddress = await db.saveAddress(req.params.customerId, req.body);
+      res.json({ success: true, data: newAddress });
+    } catch (err) {
+      next(err);
     }
-    const newAddress = db.saveAddress(req.params.customerId, req.body);
-    res.json({ success: true, data: newAddress });
   });
 
   app.patch(
     '/api/addresses/:customerId/:addressId',
     requireAuth,
-    (req: Request, res: Response, next: NextFunction) => {
+    async (req: Request, res: Response, next: NextFunction) => {
       try {
         if (req.user!.role === 'CUSTOMER' && req.user!.id !== req.params.customerId) {
           throw new ForbiddenError('Access denied: Cannot modify another customer address');
         }
-        const updated = db.updateAddress(req.params.customerId, req.params.addressId, req.body);
+        const updated = await db.updateAddress(req.params.customerId, req.params.addressId, req.body);
         if (!updated) throw new NotFoundError('Address', req.params.addressId);
         res.json({ success: true, data: updated });
       } catch (err) {
@@ -1027,12 +1262,12 @@ async function startServer() {
   app.delete(
     '/api/addresses/:customerId/:addressId',
     requireAuth,
-    (req: Request, res: Response, next: NextFunction) => {
+    async (req: Request, res: Response, next: NextFunction) => {
       try {
         if (req.user!.role === 'CUSTOMER' && req.user!.id !== req.params.customerId) {
           throw new ForbiddenError('Access denied: Cannot delete another customer address');
         }
-        const deleted = db.deleteAddress(req.params.customerId, req.params.addressId);
+        const deleted = await db.deleteAddress(req.params.customerId, req.params.addressId);
         if (!deleted) throw new NotFoundError('Address', req.params.addressId);
         res.json({ success: true, message: 'Address deleted successfully' });
       } catch (err) {
@@ -1042,10 +1277,10 @@ async function startServer() {
   );
 
   // 9. CART REVALIDATION (Public Anti-Tamper Pricing Check)
-  app.post('/api/cart/validate', (req: Request, res: Response) => {
+  app.post('/api/cart/validate', async (req: Request, res: Response) => {
     try {
       const { items } = req.body;
-      const calculation = orderService.validateAndCalculateCart(items);
+      const calculation = await orderService.validateAndCalculateCart(items);
       res.json({
         success: true,
         valid: true,
@@ -1067,33 +1302,37 @@ async function startServer() {
   });
 
   // 10. ORDERS MANAGEMENT (Strictly scoped by Authenticated Role)
-  app.get('/api/orders', requireAuth, (req: Request, res: Response) => {
-    let orders = db.getOrders();
-    const { status } = req.query;
+  app.get('/api/orders', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      let orders = await db.getOrders();
+      const { status } = req.query;
 
-    if (req.user!.role === 'CUSTOMER') {
-      // Customer can strictly ONLY see their own orders
-      orders = orders.filter((o) => o.customerId === req.user!.id);
-    } else if (req.user!.role === 'DELIVERY_PARTNER') {
-      // Delivery partner sees assigned orders or available ready orders
-      orders = orders.filter(
-        (o) =>
-          o.assignedDeliveryPartnerId === req.user!.id ||
-          (o.status === 'READY' && !o.assignedDeliveryPartnerId)
-      );
-    } else {
-      // STAFF or OWNER sees restaurant-wide orders
-      if (status) {
-        orders = orders.filter((o) => o.status === status);
+      if (req.user!.role === 'CUSTOMER') {
+        // Customer can strictly ONLY see their own orders
+        orders = orders.filter((o) => o.customerId === req.user!.id);
+      } else if (req.user!.role === 'DELIVERY_PARTNER') {
+        // Delivery partner sees assigned orders or available ready orders
+        orders = orders.filter(
+          (o) =>
+            o.assignedDeliveryPartnerId === req.user!.id ||
+            (o.status === 'READY' && !o.assignedDeliveryPartnerId)
+        );
+      } else {
+        // STAFF or OWNER sees restaurant-wide orders
+        if (status) {
+          orders = orders.filter((o) => o.status === status);
+        }
       }
-    }
 
-    res.json({ success: true, data: orders });
+      res.json({ success: true, data: orders });
+    } catch (err) {
+      next(err);
+    }
   });
 
-  app.get('/api/orders/:id', requireAuth, (req: Request, res: Response, next: NextFunction) => {
+  app.get('/api/orders/:id', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const order = db.getOrderById(req.params.id);
+      const order = await db.getOrderById(req.params.id);
       if (!order) throw new NotFoundError('Order', req.params.id);
 
       // Verify access permission
@@ -1118,7 +1357,7 @@ async function startServer() {
     '/api/orders',
     requireAuth,
     requireRole('CUSTOMER', 'OWNER', 'STAFF'),
-    (req: Request, res: Response, next: NextFunction) => {
+    async (req: Request, res: Response, next: NextFunction) => {
       try {
         const orderData = { ...req.body };
 
@@ -1129,7 +1368,7 @@ async function startServer() {
           orderData.customerPhone = req.user!.phone;
         }
 
-        const newOrder = orderService.createOrder(orderData, req.requestId);
+        const newOrder = await orderService.createOrder(orderData, req.requestId);
         res.json({ success: true, data: newOrder, message: 'Order placed successfully!' });
       } catch (err) {
         next(err);
@@ -1142,9 +1381,9 @@ async function startServer() {
     '/api/orders/:id/accept',
     requireAuth,
     requirePermission('orders.update'),
-    (req: Request, res: Response, next: NextFunction) => {
+    async (req: Request, res: Response, next: NextFunction) => {
       try {
-        const updated = orderService.transitionStatus(req.params.id, 'ACCEPTED', req.user!, req.requestId);
+        const updated = await orderService.transitionStatus(req.params.id, 'ACCEPTED', req.user!, req.requestId);
         res.json({ success: true, data: updated });
       } catch (err) {
         next(err);
@@ -1156,10 +1395,10 @@ async function startServer() {
     '/api/orders/:id/reject',
     requireAuth,
     requirePermission('orders.update'),
-    (req: Request, res: Response, next: NextFunction) => {
+    async (req: Request, res: Response, next: NextFunction) => {
       try {
         const { reason } = req.body;
-        const updated = orderService.transitionStatus(
+        const updated = await orderService.transitionStatus(
           req.params.id,
           'REJECTED',
           req.user!,
@@ -1177,9 +1416,9 @@ async function startServer() {
     '/api/orders/:id/prepare',
     requireAuth,
     requirePermission('orders.update'),
-    (req: Request, res: Response, next: NextFunction) => {
+    async (req: Request, res: Response, next: NextFunction) => {
       try {
-        const updated = orderService.transitionStatus(req.params.id, 'PREPARING', req.user!, req.requestId);
+        const updated = await orderService.transitionStatus(req.params.id, 'PREPARING', req.user!, req.requestId);
         res.json({ success: true, data: updated });
       } catch (err) {
         next(err);
@@ -1191,9 +1430,9 @@ async function startServer() {
     '/api/orders/:id/ready',
     requireAuth,
     requirePermission('orders.update'),
-    (req: Request, res: Response, next: NextFunction) => {
+    async (req: Request, res: Response, next: NextFunction) => {
       try {
-        const updated = orderService.transitionStatus(req.params.id, 'READY', req.user!, req.requestId);
+        const updated = await orderService.transitionStatus(req.params.id, 'READY', req.user!, req.requestId);
         res.json({ success: true, data: updated });
       } catch (err) {
         next(err);
@@ -1205,13 +1444,13 @@ async function startServer() {
     '/api/orders/:id/assign-delivery',
     requireAuth,
     requirePermission('orders.assign'),
-    (req: Request, res: Response, next: NextFunction) => {
+    async (req: Request, res: Response, next: NextFunction) => {
       try {
         const { deliveryPartnerId } = req.body;
         if (!deliveryPartnerId) {
           throw new ValidationError('Delivery partner ID required');
         }
-        const updated = orderService.transitionStatus(
+        const updated = await orderService.transitionStatus(
           req.params.id,
           'ASSIGNED',
           req.user!,
@@ -1229,16 +1468,16 @@ async function startServer() {
     '/api/orders/:id/pickup',
     requireAuth,
     requirePermission('orders.deliver'),
-    (req: Request, res: Response, next: NextFunction) => {
+    async (req: Request, res: Response, next: NextFunction) => {
       try {
-        const order = db.getOrderById(req.params.id);
+        const order = await db.getOrderById(req.params.id);
         if (!order) throw new NotFoundError('Order', req.params.id);
 
         if (req.user!.role === 'DELIVERY_PARTNER' && order.assignedDeliveryPartnerId !== req.user!.id) {
           throw new ForbiddenError('Access denied: You are not assigned to this delivery order');
         }
 
-        const updated = orderService.transitionStatus(req.params.id, 'PICKED_UP', req.user!, req.requestId);
+        const updated = await orderService.transitionStatus(req.params.id, 'PICKED_UP', req.user!, req.requestId);
         res.json({ success: true, data: updated });
       } catch (err) {
         next(err);
@@ -1250,16 +1489,16 @@ async function startServer() {
     '/api/orders/:id/out-for-delivery',
     requireAuth,
     requirePermission('orders.deliver'),
-    (req: Request, res: Response, next: NextFunction) => {
+    async (req: Request, res: Response, next: NextFunction) => {
       try {
-        const order = db.getOrderById(req.params.id);
+        const order = await db.getOrderById(req.params.id);
         if (!order) throw new NotFoundError('Order', req.params.id);
 
         if (req.user!.role === 'DELIVERY_PARTNER' && order.assignedDeliveryPartnerId !== req.user!.id) {
           throw new ForbiddenError('Access denied: You are not assigned to this delivery order');
         }
 
-        const updated = orderService.transitionStatus(
+        const updated = await orderService.transitionStatus(
           req.params.id,
           'OUT_FOR_DELIVERY',
           req.user!,
@@ -1276,16 +1515,16 @@ async function startServer() {
     '/api/orders/:id/deliver',
     requireAuth,
     requirePermission('orders.deliver'),
-    (req: Request, res: Response, next: NextFunction) => {
+    async (req: Request, res: Response, next: NextFunction) => {
       try {
-        const order = db.getOrderById(req.params.id);
+        const order = await db.getOrderById(req.params.id);
         if (!order) throw new NotFoundError('Order', req.params.id);
 
         if (req.user!.role === 'DELIVERY_PARTNER' && order.assignedDeliveryPartnerId !== req.user!.id) {
           throw new ForbiddenError('Access denied: You are not assigned to this delivery order');
         }
 
-        const updated = orderService.transitionStatus(req.params.id, 'DELIVERED', req.user!, req.requestId);
+        const updated = await orderService.transitionStatus(req.params.id, 'DELIVERED', req.user!, req.requestId);
         res.json({ success: true, data: updated });
       } catch (err) {
         next(err);
@@ -1296,12 +1535,11 @@ async function startServer() {
   app.post(
     '/api/orders/:id/cancel',
     requireAuth,
-    (req: Request, res: Response, next: NextFunction) => {
+    async (req: Request, res: Response, next: NextFunction) => {
       try {
-        const order = db.getOrderById(req.params.id);
+        const order = await db.getOrderById(req.params.id);
         if (!order) throw new NotFoundError('Order', req.params.id);
 
-        // Authorization: Customer can only cancel their own PLACED order; staff/owner needs orders.cancel
         if (req.user!.role === 'CUSTOMER') {
           if (order.customerId !== req.user!.id) {
             throw new ForbiddenError('Access denied: You do not own this order');
@@ -1314,7 +1552,7 @@ async function startServer() {
         }
 
         const { reason } = req.body;
-        const updated = orderService.transitionStatus(
+        const updated = await orderService.transitionStatus(
           req.params.id,
           'CANCELLED',
           req.user!,
@@ -1333,13 +1571,13 @@ async function startServer() {
     '/api/delivery/batches',
     requireAuth,
     requireRole('OWNER', 'STAFF'),
-    (req: Request, res: Response, next: NextFunction) => {
+    async (req: Request, res: Response, next: NextFunction) => {
       try {
         const { deliveryPartnerId, orderIds } = req.body;
         if (!deliveryPartnerId || !orderIds || orderIds.length === 0) {
           throw new ValidationError('Delivery partner and order list required');
         }
-        const batch = db.createDeliveryBatch(deliveryPartnerId, orderIds);
+        const batch = await db.createDeliveryBatch(deliveryPartnerId, orderIds);
         res.json({ success: true, data: batch, message: `Created Delivery Batch ${batch.batchNumber}` });
       } catch (err) {
         next(err);
@@ -1347,32 +1585,45 @@ async function startServer() {
     }
   );
 
-  app.get('/api/delivery/batches', requireAuth, (req: Request, res: Response) => {
-    let batches = db.getDeliveryBatches();
-    if (req.user!.role === 'DELIVERY_PARTNER') {
-      batches = batches.filter((b) => b.deliveryPartnerId === req.user!.id);
+  app.get('/api/delivery/batches', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      let batches = await db.getDeliveryBatches();
+      if (req.user!.role === 'DELIVERY_PARTNER') {
+        batches = batches.filter((b) => b.deliveryPartnerId === req.user!.id);
+      }
+      res.json({ success: true, data: batches });
+    } catch (err) {
+      next(err);
     }
-    res.json({ success: true, data: batches });
   });
 
   // 13. REVIEWS & RATINGS
-  app.get('/api/reviews', (req: Request, res: Response) => {
-    res.json({ success: true, data: db.getReviews() });
+  app.get('/api/reviews', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const reviews = await db.getReviews();
+      res.json({ success: true, data: reviews });
+    } catch (err) {
+      next(err);
+    }
   });
 
-  app.get('/api/menu-items/:id/reviews', (req: Request, res: Response) => {
-    const data = db.getMenuItemReviews(req.params.id);
-    res.json({ success: true, data });
+  app.get('/api/menu-items/:id/reviews', async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const data = await db.getMenuItemReviews(req.params.id);
+      res.json({ success: true, data });
+    } catch (err) {
+      next(err);
+    }
   });
 
-  app.post('/api/reviews', requireAuth, (req: Request, res: Response, next: NextFunction) => {
+  app.post('/api/reviews', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
     try {
       const reviewData = {
         ...req.body,
         customerId: req.user!.id,
         customerName: req.user!.name
       };
-      const review = db.createReview(reviewData);
+      const review = await db.createReview(reviewData);
       res.json({ success: true, data: review, message: 'Thank you for your feedback!' });
     } catch (err) {
       next(err);
@@ -1380,45 +1631,90 @@ async function startServer() {
   });
 
   // 14. NOTIFICATIONS
-  app.get('/api/notifications/:userId', requireAuth, (req: Request, res: Response) => {
-    if (req.user!.role === 'CUSTOMER' && req.user!.id !== req.params.userId) {
-      throw new ForbiddenError('Access denied');
+  app.get('/api/notifications/:userId', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      if (req.user!.role === 'CUSTOMER' && req.user!.id !== req.params.userId) {
+        throw new ForbiddenError('Access denied');
+      }
+      const notifs = await db.getNotifications(req.params.userId);
+      res.json({ success: true, data: notifs });
+    } catch (err) {
+      next(err);
     }
-    res.json({ success: true, data: db.getNotifications(req.params.userId) });
   });
 
-  app.patch('/api/notifications/:id/read', requireAuth, (req: Request, res: Response) => {
-    db.markNotificationAsRead(req.params.id);
-    res.json({ success: true });
+  app.patch('/api/notifications/:id/read', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      await db.markNotificationAsRead(req.params.id);
+      res.json({ success: true });
+    } catch (err) {
+      next(err);
+    }
   });
 
   // 15. ANALYTICS & PRODUCTION OBSERVABILITY APIS (Strictly Owner-Only)
-  app.get('/api/owner/analytics', requireAuth, requireRole('OWNER'), (req: Request, res: Response) => {
-    res.json({ success: true, data: db.getAnalytics() });
+  app.get('/api/owner/analytics', requireAuth, requireRole('OWNER'), async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const analytics = await db.getAnalytics();
+      res.json({ success: true, data: analytics });
+    } catch (err) {
+      next(err);
+    }
   });
 
   // Production Audit Trail Endpoint
-  app.get('/api/owner/audit-logs', requireAuth, requireRole('OWNER'), (req: Request, res: Response) => {
-    const limit = parseInt(req.query.limit as string) || 100;
-    res.json({ success: true, data: auditService.getLogs(limit) });
+  app.get('/api/owner/audit-logs', requireAuth, requireRole('OWNER'), async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 100;
+      const logs = await auditService.getLogs(limit);
+      res.json({ success: true, data: logs });
+    } catch (err) {
+      next(err);
+    }
+  });
+
+  // Staff & Delivery Actions Endpoint (Daily Operational Log)
+  app.get('/api/owner/staff-actions', requireAuth, requireRole('OWNER'), async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const date = req.query.date as string | undefined;
+      const role = req.query.role as string | undefined;
+      const limit = parseInt(req.query.limit as string) || 1000;
+      const result = await auditService.getStaffAndDeliveryActions({ date, role, limit });
+      res.json({ success: true, data: result.actions, summary: result.summary });
+    } catch (err) {
+      next(err);
+    }
   });
 
   // Cryptographic Chain Integrity Verification Endpoint
-  app.get('/api/owner/audit-logs/verify', requireAuth, requireRole('OWNER'), (req: Request, res: Response) => {
-    const integrityReport = auditService.verifyIntegrity();
-    res.json({ success: true, data: integrityReport });
+  app.get('/api/owner/audit-logs/verify', requireAuth, requireRole('OWNER'), async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const integrityReport = await auditService.verifyIntegrity();
+      res.json({ success: true, data: integrityReport });
+    } catch (err) {
+      next(err);
+    }
   });
 
   // Production Outbox Monitor Endpoint
-  app.get('/api/owner/outbox', requireAuth, requireRole('OWNER'), (req: Request, res: Response) => {
-    const limit = parseInt(req.query.limit as string) || 50;
-    res.json({ success: true, data: outboxRepository.getAll(limit) });
+  app.get('/api/owner/outbox', requireAuth, requireRole('OWNER'), async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 50;
+      const events = await outboxRepository.getAll(limit);
+      res.json({ success: true, data: events });
+    } catch (err) {
+      next(err);
+    }
   });
 
   // Production Data Integrity & Reconciliation Audit Endpoint
-  app.get('/api/owner/reconciliation', requireAuth, requireRole('OWNER'), (req: Request, res: Response) => {
-    const report = reconciliationService.runAudit();
-    res.json({ success: true, data: report });
+  app.get('/api/owner/reconciliation', requireAuth, requireRole('OWNER'), async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const report = await reconciliationService.runAudit();
+      res.json({ success: true, data: report });
+    } catch (err) {
+      next(err);
+    }
   });
 
   // 16. GLOBAL ERROR HANDLER
@@ -1445,7 +1741,7 @@ async function startServer() {
 
   // 18. SERVER BOOT & BACKGROUND WORKER INITIALIZATION
   const server = app.listen(PORT, '0.0.0.0', () => {
-    logger.info(`Hunter's Kitchen Server booted on port ${PORT} [ENV: ${config.env}]`);
+    logger.info(`Hunter's Kitchen Server booted on port ${PORT} [ENV: ${config.env}] with PostgreSQL authoritative backend.`);
     outboxWorker.start();
   });
 

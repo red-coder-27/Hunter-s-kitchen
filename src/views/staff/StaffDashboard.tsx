@@ -236,24 +236,12 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({ activeTab = 'sta
   // Render the role name beautifully
   const getRoleLabel = (role: StaffSubRole) => {
     switch (role) {
-      case 'KITCHEN_MANAGER':
-        return 'Kitchen Operations Manager';
       case 'GENERAL_MANAGER':
-        return 'General Manager';
-      case 'HEAD_CHEF':
-        return 'Head Executive Chef';
-      case 'KITCHEN_CHEF':
-        return 'Kitchen Chef';
-      case 'LINE_COOK':
-        return 'Line Cook / Prep';
-      case 'ORDER_BILLER':
-        return 'Order Desk & Biller';
-      case 'FRONT_DESK':
-        return 'Front Desk & Reception';
-      case 'STORE_DISPATCHER':
-        return 'Store & Fleet Dispatcher';
+        return 'General Manager (All Access & Deliveries)';
+      case 'KITCHEN_STAFF':
+      case 'STAFF':
       default:
-        return 'Kitchen Operations Staff';
+        return 'Kitchen Staff (Order Accept, Reject & Assign)';
     }
   };
 
@@ -658,6 +646,11 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({ activeTab = 'sta
                           className="w-full p-2 border border-stone-200 rounded-lg text-xs font-semibold bg-white text-stone-800 focus:outline-none focus:border-emerald-500"
                         >
                           <option value="" disabled>Assign Delivery Partner...</option>
+                          {currentUser?.staffRole === 'GENERAL_MANAGER' && (
+                            <option value={currentUser.id}>
+                              ⭐ Self-Assign: {currentUser.name} (General Manager)
+                            </option>
+                          )}
                           {deliveryPartners.map((p) => (
                             <option key={p.id} value={p.id}>
                               {p.name} ({p.vehicleNumber || 'Bike'})

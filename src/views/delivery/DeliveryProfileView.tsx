@@ -3,6 +3,13 @@ import { useAuth } from '../../context/AuthContext';
 import { useNotification } from '../../context/NotificationContext';
 import { apiService } from '../../services/api';
 import {
+  validateName,
+  validatePhone,
+  validateEmail,
+  sanitizeTypingPhone,
+  sanitizeTypingName
+} from '../../utils/validation';
+import {
   User,
   Phone,
   Mail,
@@ -84,17 +91,33 @@ export const DeliveryProfileView: React.FC = () => {
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim() || !email.trim() || !phone.trim()) {
-      setFeedback({ type: 'error', text: 'All contact details (Name, Gmail, and Phone) are required.' });
+    
+    // Strict client-side validation & formatting
+    const nameRes = validateName(name);
+    if (!nameRes.isValid) {
+      setFeedback({ type: 'error', text: nameRes.error || 'Please enter a valid full name.' });
       return;
     }
+
+    const phoneRes = validatePhone(phone);
+    if (!phoneRes.isValid) {
+      setFeedback({ type: 'error', text: phoneRes.error || 'Please enter a valid 10-digit mobile number.' });
+      return;
+    }
+
+    const emailRes = validateEmail(email);
+    if (!emailRes.isValid) {
+      setFeedback({ type: 'error', text: emailRes.error || 'Please enter a valid Gmail address.' });
+      return;
+    }
+
     setIsSaving(true);
     setFeedback(null);
     try {
       await updateUserProfile({
-        name: name.trim(),
-        email: email.trim(),
-        phone: phone.trim()
+        name: nameRes.value,
+        email: emailRes.value,
+        phone: phoneRes.value
       });
       setIsEditing(false);
       setFeedback({ type: 'success', text: 'Delivery partner profile updated successfully!' });
@@ -199,7 +222,9 @@ export const DeliveryProfileView: React.FC = () => {
               <input
                 type="text"
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => setName(e.target.value.slice(0, 70))}
+                maxLength={70}
+                placeholder="Enter full name"
                 className="w-full p-2.5 border border-stone-300 rounded-xl font-semibold text-stone-900 focus:ring-2 focus:ring-red-600/20 focus:border-red-600 outline-none"
                 required
               />
@@ -212,6 +237,7 @@ export const DeliveryProfileView: React.FC = () => {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  placeholder="name@gmail.com"
                   className="w-full p-2.5 border border-stone-300 rounded-xl font-semibold text-stone-900 focus:ring-2 focus:ring-red-600/20 focus:border-red-600 outline-none"
                   required
                 />
@@ -222,7 +248,9 @@ export const DeliveryProfileView: React.FC = () => {
                 <input
                   type="tel"
                   value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
+                  onChange={(e) => setPhone(sanitizeTypingPhone(e.target.value))}
+                  placeholder="e.g. 9876543210"
+                  maxLength={10}
                   className="w-full p-2.5 border border-stone-300 rounded-xl font-semibold text-stone-900 focus:ring-2 focus:ring-red-600/20 focus:border-red-600 outline-none"
                   required
                 />

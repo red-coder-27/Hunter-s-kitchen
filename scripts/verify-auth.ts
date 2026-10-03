@@ -1,8 +1,10 @@
+import { postgresDb } from '../src/server/db/postgres';
 import { authService } from '../src/server/services/authService';
 import { db } from '../src/server/db';
 import bcrypt from 'bcryptjs';
 
 async function runAuthVerification() {
+  await postgresDb.initialize();
   console.log('================================================================');
   console.log('🔐 THE HUNTER — PRODUCTION AUTHENTICATION & AUTHORIZATION SUITE');
   console.log('================================================================');
@@ -11,7 +13,7 @@ async function runAuthVerification() {
   console.log('\n👉 [TEST 1] Password Hashing & Failed Attempt Rejection');
   try {
     await authService.login(
-      'owner@hunterskitchen.com',
+      'hunterkitchen777@gmail.com',
       'WrongPassword123!',
       { ip: '127.0.0.1', userAgent: 'test-agent', requestId: 'req_auth_test_1' }
     );
@@ -27,8 +29,8 @@ async function runAuthVerification() {
   // Test 2: Valid Login & Role/Permissions Resolution
   console.log('\n👉 [TEST 2] Valid Credential Login & Server-Authoritative Session');
   const loginRes = await authService.login(
-    'owner@hunterskitchen.com',
-    'Hunter@2026!',
+    'hunterkitchen777@gmail.com',
+    'hunter__kitchen777',
     { ip: '127.0.0.1', userAgent: 'test-agent', requestId: 'req_auth_test_2' }
   );
 
@@ -90,7 +92,7 @@ async function runAuthVerification() {
 
   // Test 7: Forgot Password & Reset Token Flow
   console.log('\n👉 [TEST 7] Self-Service Password Reset Flow');
-  const forgotRes = authService.forgotPassword(
+  const forgotRes = await authService.forgotPassword(
     'customer1@hunterskitchen.com',
     { ip: '127.0.0.1', requestId: 'req_auth_test_6' }
   );

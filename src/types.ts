@@ -1,14 +1,16 @@
 export type UserRole = 'CUSTOMER' | 'STAFF' | 'ADMIN' | 'OWNER' | 'DELIVERY_PARTNER';
 
 export type StaffSubRole =
+  | 'KITCHEN_STAFF'
+  | 'GENERAL_MANAGER'
+  | 'STAFF'
   | 'KITCHEN_MANAGER'
   | 'HEAD_CHEF'
   | 'LINE_COOK'
   | 'FRONT_DESK'
   | 'KITCHEN_CHEF'
   | 'ORDER_BILLER'
-  | 'STORE_DISPATCHER'
-  | 'GENERAL_MANAGER';
+  | 'STORE_DISPATCHER';
 
 export type Permission =
   | 'orders.read'

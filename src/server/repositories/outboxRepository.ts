@@ -1,95 +1,123 @@
-import fs from 'fs';
-import path from 'path';
 import { OutboxEvent } from '../models/productionTypes';
-
-const DATA_DIR = path.join(process.cwd(), 'data');
-const OUTBOX_FILE = path.join(DATA_DIR, 'outbox_events.json');
+import { postgresDb } from '../db/postgres';
+import { logger } from '../utils/logger';
 
 class OutboxRepository {
-  private events: OutboxEvent[] = [];
-
-  constructor() {
-    this.init();
-  }
-
-  private init() {
+  async insert(event: OutboxEvent): Promise<void> {
     try {
-      if (!fs.existsSync(DATA_DIR)) {
-        fs.mkdirSync(DATA_DIR, { recursive: true });
-      }
-      if (fs.existsSync(OUTBOX_FILE)) {
-        const raw = fs.readFileSync(OUTBOX_FILE, 'utf-8');
-        this.events = JSON.parse(raw);
-        // Automatically recover any orphaned PROCESSING events from previous crashes
-        this.recoverStaleProcessing(0);
-      } else {
-        this.events = [];
-        this.persist();
-      }
-    } catch (e) {
-      console.warn('Failed to load outbox from disk, starting empty');
-      this.events = [];
+      await postgresDb.query(
+        `INSERT INTO outbox_events (
+          id, aggregate_type, aggregate_id, event_type, payload, status,
+          retry_count, max_retries, last_error, processing_started_at,
+          created_at, processed_at, next_retry_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+        ON CONFLICT (id) DO UPDATE SET
+          payload = EXCLUDED.payload,
+          status = EXCLUDED.status,
+          retry_count = EXCLUDED.retry_count,
+          last_error = EXCLUDED.last_error,
+          processing_started_at = EXCLUDED.processing_started_at,
+          processed_at = EXCLUDED.processed_at,
+          next_retry_at = EXCLUDED.next_retry_at`,
+        [
+          event.id,
+          event.aggregateType,
+          event.aggregateId,
+          event.eventType,
+          JSON.stringify(event.payload || {}),
+          event.status || 'PENDING',
+          event.retryCount || 0,
+          event.maxRetries || 3,
+          event.lastError || null,
+          event.processingStartedAt ? new Date(event.processingStartedAt) : null,
+          event.createdAt || new Date().toISOString(),
+          event.processedAt ? new Date(event.processedAt) : null,
+          event.nextRetryAt ? new Date(event.nextRetryAt) : null
+        ]
+      );
+    } catch (e: any) {
+      logger.error('Failed to insert outbox event into PostgreSQL', { error: e.message });
+      throw e;
     }
   }
 
-  /**
-   * Resets any stale PROCESSING event back to PENDING.
-   * If timeoutMs is 0, resets all PROCESSING events (e.g. upon server boot).
-   */
-  recoverStaleProcessing(timeoutMs: number = 60000): number {
-    const now = Date.now();
-    let recoveredCount = 0;
-
-    for (const event of this.events) {
-      if (event.status === 'PROCESSING') {
-        const startedTime = event.processingStartedAt ? new Date(event.processingStartedAt).getTime() : 0;
-        if (timeoutMs === 0 || now - startedTime > timeoutMs) {
-          event.status = 'PENDING';
-          event.processingStartedAt = undefined;
-          recoveredCount++;
-        }
-      }
-    }
-
-    if (recoveredCount > 0) {
-      this.persist();
-    }
-    return recoveredCount;
+  async getPendingEvents(limit: number = 20): Promise<OutboxEvent[]> {
+    const res = await postgresDb.query(
+      `SELECT * FROM outbox_events
+       WHERE (status = 'PENDING' OR status = 'FAILED')
+         AND (next_retry_at IS NULL OR next_retry_at <= NOW())
+       ORDER BY created_at ASC
+       LIMIT $1`,
+      [limit]
+    );
+    return res.rows.map(this.rowToEvent);
   }
 
-  private persist() {
-    try {
-      if (!fs.existsSync(DATA_DIR)) {
-        fs.mkdirSync(DATA_DIR, { recursive: true });
-      }
-      fs.writeFileSync(OUTBOX_FILE, JSON.stringify(this.events, null, 2), 'utf-8');
-    } catch (e) {
-      console.error('Failed to write outbox to disk', e);
-    }
+  async update(id: string, updates: Partial<OutboxEvent>): Promise<OutboxEvent | undefined> {
+    const current = await this.getById(id);
+    if (!current) return undefined;
+
+    const merged = { ...current, ...updates };
+
+    const res = await postgresDb.query(
+      `UPDATE outbox_events SET
+        status = $1, retry_count = $2, max_retries = $3, last_error = $4,
+        processing_started_at = $5, processed_at = $6, next_retry_at = $7
+      WHERE id = $8 RETURNING *`,
+      [
+        merged.status,
+        merged.retryCount,
+        merged.maxRetries,
+        merged.lastError || null,
+        merged.processingStartedAt ? new Date(merged.processingStartedAt) : null,
+        merged.processedAt ? new Date(merged.processedAt) : null,
+        merged.nextRetryAt ? new Date(merged.nextRetryAt) : null,
+        id
+      ]
+    );
+
+    if (res.rows.length === 0) return undefined;
+    return this.rowToEvent(res.rows[0]);
   }
 
-  insert(event: OutboxEvent): void {
-    this.events.push(event);
-    this.persist();
+  async getById(id: string): Promise<OutboxEvent | undefined> {
+    const res = await postgresDb.query('SELECT * FROM outbox_events WHERE id = $1', [id]);
+    if (res.rows.length === 0) return undefined;
+    return this.rowToEvent(res.rows[0]);
   }
 
-  getPendingEvents(limit: number = 20): OutboxEvent[] {
-    const now = new Date().toISOString();
-    return this.events
-      .filter((e) => (e.status === 'PENDING' || e.status === 'FAILED') && (!e.nextRetryAt || e.nextRetryAt <= now))
-      .slice(0, limit);
+  async getAll(limit: number = 50): Promise<OutboxEvent[]> {
+    const res = await postgresDb.query('SELECT * FROM outbox_events ORDER BY created_at DESC LIMIT $1', [limit]);
+    return res.rows.map(this.rowToEvent);
   }
 
-  update(id: string, updates: Partial<OutboxEvent>): OutboxEvent | undefined {
-    const idx = this.events.findIndex((e) => e.id === id);
-    if (idx === -1) return undefined;
-    this.events[idx] = { ...this.events[idx], ...updates };
-    this.persist();
-    return this.events[idx];
+  async recoverStaleProcessing(timeoutMs: number = 60000): Promise<number> {
+    const cutoff = new Date(Date.now() - timeoutMs);
+    const res = await postgresDb.query(
+      `UPDATE outbox_events SET status = 'PENDING', processing_started_at = NULL
+       WHERE status = 'PROCESSING' AND (processing_started_at IS NULL OR processing_started_at < $1)`,
+      [cutoff]
+    );
+    return res.rowCount || 0;
   }
 
-  getAll(limit: number = 50): OutboxEvent[] {
-    return [...this.events].reverse().slice(0, limit);
+  private rowToEvent(r: any): OutboxEvent {
+    const parseJson = (v: any) => (typeof v === 'string' ? JSON.parse(v) : v);
+    return {
+      id: r.id,
+      aggregateType: r.aggregate_type,
+      aggregateId: r.aggregate_id,
+      eventType: r.event_type,
+      payload: parseJson(r.payload),
+      status: r.status,
+      retryCount: Number(r.retry_count || 0),
+      maxRetries: Number(r.max_retries || 3),
+      lastError: r.last_error || undefined,
+      processingStartedAt: r.processing_started_at ? new Date(r.processing_started_at).toISOString() : undefined,
+      createdAt: r.created_at ? new Date(r.created_at).toISOString() : new Date().toISOString(),
+      processedAt: r.processed_at ? new Date(r.processed_at).toISOString() : undefined,
+      nextRetryAt: r.next_retry_at ? new Date(r.next_retry_at).toISOString() : undefined
+    };
   }
 }
 

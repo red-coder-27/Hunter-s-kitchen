@@ -3,6 +3,15 @@ import { useAuth } from '../../context/AuthContext';
 import { useNotification } from '../../context/NotificationContext';
 import { apiService } from '../../services/api';
 import { OtpInput } from '../../components/auth/OtpInput';
+import { StaffActivityLogHub } from '../../components/StaffActivityLogHub';
+import {
+  validateName,
+  validatePhone,
+  validateEmail,
+  validatePassword,
+  sanitizeTypingPhone,
+  sanitizeTypingName
+} from '../../utils/validation';
 import {
   User,
   Store,
@@ -32,7 +41,9 @@ import {
   Lock,
   Eye,
   EyeOff,
-  KeyRound
+  KeyRound,
+  RotateCcw,
+  ClipboardList
 } from 'lucide-react';
 
 export const OwnerProfileView: React.FC = () => {
@@ -209,28 +220,35 @@ export const OwnerProfileView: React.FC = () => {
   // Save Admin Personal Profile (Requires Gmail OTP if email changed)
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!adminName.trim() || !adminEmail.trim() || !adminPhone.trim()) {
-      setProfileMsg({ type: 'error', text: 'All profile fields (Name, Gmail, Phone) are required.' });
+    
+    // Strict client-side validation & formatting
+    const nameRes = validateName(adminName);
+    if (!nameRes.isValid) {
+      setProfileMsg({ type: 'error', text: nameRes.error || 'Please enter a valid full name.' });
       return;
     }
 
-    if (!adminEmail.includes('@') || !adminEmail.includes('.')) {
-      setProfileMsg({ type: 'error', text: 'Please enter a valid Gmail / Email address.' });
+    const phoneRes = validatePhone(adminPhone);
+    if (!phoneRes.isValid) {
+      setProfileMsg({ type: 'error', text: phoneRes.error || 'Please enter a valid 10-digit mobile number.' });
+      return;
+    }
+
+    const emailRes = validateEmail(adminEmail);
+    if (!emailRes.isValid) {
+      setProfileMsg({ type: 'error', text: emailRes.error || 'Please enter a valid Gmail address.' });
       return;
     }
 
     if (adminPassword) {
-      if (adminPassword.length < 6) {
-        setProfileMsg({ type: 'error', text: 'Password must be at least 6 characters.' });
-        return;
-      }
-      if (adminPassword !== adminConfirmPassword) {
-        setProfileMsg({ type: 'error', text: 'Passwords do not match. Please verify your confirm password.' });
+      const passRes = validatePassword(adminPassword, adminConfirmPassword);
+      if (!passRes.isValid) {
+        setProfileMsg({ type: 'error', text: passRes.error || 'Invalid password.' });
         return;
       }
     }
 
-    const isEmailChanging = adminEmail.trim().toLowerCase() !== (currentUser?.email || '').toLowerCase();
+    const isEmailChanging = emailRes.value !== (currentUser?.email || '').toLowerCase();
 
     // If email is changing, OTP verification through Gmail is mandatory!
     if (isEmailChanging) {
@@ -239,9 +257,9 @@ export const OwnerProfileView: React.FC = () => {
       setOtpModalError(null);
       setEmailOtpCode('');
       try {
-        const res = await apiService.sendOtp(adminEmail.trim().toLowerCase(), 'EMAIL_CHANGE');
+        const res = await apiService.sendOtp(emailRes.value, 'EMAIL_CHANGE');
         setOtpCountdown(res.expiresInSeconds || 600);
-        setResendCooldown(60);
+        setResendCooldown(20);
         setShowEmailOtpModal(true);
       } catch (err: any) {
         console.error(err);
@@ -257,9 +275,9 @@ export const OwnerProfileView: React.FC = () => {
     setProfileMsg(null);
     try {
       await updateUserProfile({
-        name: adminName.trim(),
-        email: adminEmail.trim(),
-        phone: adminPhone.trim(),
+        name: nameRes.value,
+        email: emailRes.value,
+        phone: phoneRes.value,
         password: adminPassword.trim() || undefined
       });
       setIsEditingProfile(false);
@@ -282,7 +300,7 @@ export const OwnerProfileView: React.FC = () => {
     try {
       const res = await apiService.sendOtp(adminEmail.trim().toLowerCase(), 'EMAIL_CHANGE');
       setOtpCountdown(res.expiresInSeconds || 600);
-      setResendCooldown(60);
+      setResendCooldown(20);
     } catch (err: any) {
       setOtpModalError(err.message || 'Failed to resend code');
     }
@@ -296,13 +314,22 @@ export const OwnerProfileView: React.FC = () => {
       return;
     }
 
+    const nameRes = validateName(adminName);
+    const phoneRes = validatePhone(adminPhone);
+    const emailRes = validateEmail(adminEmail);
+
+    if (!nameRes.isValid || !phoneRes.isValid || !emailRes.isValid) {
+      setOtpModalError(nameRes.error || phoneRes.error || emailRes.error || 'Please ensure all profile fields are valid.');
+      return;
+    }
+
     setIsVerifyingEmailOtp(true);
     setOtpModalError(null);
     try {
       await updateUserProfile({
-        name: adminName.trim(),
-        phone: adminPhone.trim(),
-        email: adminEmail.trim().toLowerCase(),
+        name: nameRes.value,
+        phone: phoneRes.value,
+        email: emailRes.value,
         password: adminPassword.trim() || undefined,
         otp: emailOtpCode.trim()
       });
@@ -314,7 +341,7 @@ export const OwnerProfileView: React.FC = () => {
       setEmailOtpCode('');
       setProfileMsg({
         type: 'success',
-        text: `Gmail address verified and updated to ${adminEmail.trim().toLowerCase()}! From now on, you must log in using this new Gmail and your password.`
+        text: `Gmail address verified and updated to ${emailRes.value}! From now on, you must log in using this new Gmail and your password.`
       });
       setTimeout(() => setProfileMsg(null), 6000);
     } catch (err: any) {
@@ -490,18 +517,14 @@ export const OwnerProfileView: React.FC = () => {
         </button>
 
         <button
-          onClick={() => {
-            setActiveTab('audit_logs');
-            handleVerifyAudit();
-            handleLoadOutbox();
-          }}
+          onClick={() => setActiveTab('audit_logs')}
           className={`flex-1 py-2.5 px-3 rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer ${
             activeTab === 'audit_logs'
               ? 'bg-white text-stone-900 shadow-sm font-extrabold'
               : 'text-stone-600 hover:text-stone-900'
           }`}
         >
-          <ShieldCheck className="w-4 h-4 text-emerald-600" /> Integrity & Outbox
+          <ClipboardList className="w-4 h-4 text-emerald-600" /> Staff & Delivery Activity Log
         </button>
       </div>
 
@@ -535,21 +558,13 @@ export const OwnerProfileView: React.FC = () => {
                 <p className="text-xs text-stone-500 font-medium">Manage your administrator account credentials</p>
               </div>
 
-              {!isEditingProfile ? (
+              {!isEditingProfile && (
                 <button
                   type="button"
                   onClick={() => setIsEditingProfile(true)}
                   className="px-3.5 py-1.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-800 font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
                 >
                   <Edit2 className="w-3.5 h-3.5 text-stone-600" /> Edit Details
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setIsEditingProfile(false)}
-                  className="px-3.5 py-1.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-600 font-bold text-xs flex items-center gap-1 transition-colors cursor-pointer"
-                >
-                  <X className="w-3.5 h-3.5" /> Cancel
                 </button>
               )}
             </div>
@@ -561,8 +576,9 @@ export const OwnerProfileView: React.FC = () => {
                   <input
                     type="text"
                     value={adminName}
-                    onChange={(e) => setAdminName(e.target.value)}
+                    onChange={(e) => setAdminName(e.target.value.slice(0, 70))}
                     placeholder="e.g. Karthik Raja"
+                    maxLength={70}
                     className="w-full p-3 border border-stone-300 rounded-xl font-semibold text-stone-900 focus:ring-2 focus:ring-red-600/20 focus:border-red-600 outline-none"
                     required
                   />
@@ -591,8 +607,9 @@ export const OwnerProfileView: React.FC = () => {
                     <input
                       type="tel"
                       value={adminPhone}
-                      onChange={(e) => setAdminPhone(e.target.value)}
-                      placeholder="+91 98765 43210"
+                      onChange={(e) => setAdminPhone(sanitizeTypingPhone(e.target.value))}
+                      placeholder="e.g. 9876543210"
+                      maxLength={10}
                       className="w-full p-3 border border-stone-300 rounded-xl font-semibold text-stone-900 focus:ring-2 focus:ring-red-600/20 focus:border-red-600 outline-none"
                       required
                     />
@@ -621,15 +638,16 @@ export const OwnerProfileView: React.FC = () => {
                           value={adminPassword}
                           onChange={(e) => setAdminPassword(e.target.value)}
                           placeholder="Leave blank to keep existing"
-                          className="w-full p-3 pr-10 border border-stone-300 rounded-xl font-semibold text-stone-900 focus:ring-2 focus:ring-red-600/20 focus:border-red-600 outline-none"
+                          className="w-full p-3 pr-10 border border-stone-300 rounded-xl font-semibold text-stone-900 focus:ring-2 focus:ring-red-600/20 focus:border-red-600 outline-none [&::-ms-reveal]:hidden [&::-ms-clear]:hidden"
                         />
                         <button
                           type="button"
                           onClick={() => setShowPassword(!showPassword)}
                           className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 cursor-pointer"
+                          title={showPassword ? "Hide password" : "Show password"}
                           tabIndex={-1}
                         >
-                          {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          {showPassword ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                         </button>
                       </div>
                     </div>
@@ -644,15 +662,16 @@ export const OwnerProfileView: React.FC = () => {
                           value={adminConfirmPassword}
                           onChange={(e) => setAdminConfirmPassword(e.target.value)}
                           placeholder="Re-type new password"
-                          className="w-full p-3 pr-10 border border-stone-300 rounded-xl font-semibold text-stone-900 focus:ring-2 focus:ring-red-600/20 focus:border-red-600 outline-none"
+                          className="w-full p-3 pr-10 border border-stone-300 rounded-xl font-semibold text-stone-900 focus:ring-2 focus:ring-red-600/20 focus:border-red-600 outline-none [&::-ms-reveal]:hidden [&::-ms-clear]:hidden"
                         />
                         <button
                           type="button"
                           onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                           className="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-700 cursor-pointer"
+                          title={showConfirmPassword ? "Hide password" : "Show password"}
                           tabIndex={-1}
                         >
-                          {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          {showConfirmPassword ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                         </button>
                       </div>
                     </div>
@@ -1013,81 +1032,10 @@ export const OwnerProfileView: React.FC = () => {
       {/* SUB-TAB 3: INTEGRITY & OUTBOX */}
       {/* ========================================================================= */}
       {activeTab === 'audit_logs' && (
-        <div className="space-y-4 animate-in fade-in duration-200 text-xs">
-          <div className="bg-white rounded-3xl border border-stone-200 p-5 shadow-xs space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <h4 className="font-extrabold text-sm text-stone-900 flex items-center gap-2">
-                  <ShieldCheck className="w-4 h-4 text-emerald-600" /> Cryptographic Audit Ledger
-                </h4>
-                <p className="text-xs text-stone-500 font-medium">Verify blockchain-style SHA-256 tamper-proof log</p>
-              </div>
-
-              <button
-                type="button"
-                onClick={handleVerifyAudit}
-                disabled={isVerifyingChain}
-                className="px-3.5 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-800 rounded-xl font-bold text-xs flex items-center gap-1.5"
-              >
-                {isVerifyingChain ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />}
-                <span>Verify Ledger</span>
-              </button>
-            </div>
-
-            {integrityReport ? (
-              <div className={`p-3.5 rounded-2xl border ${integrityReport.valid ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-rose-50 border-rose-200 text-rose-900'}`}>
-                <p className="font-bold flex items-center gap-1.5">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  <span>Ledger Integrity: {integrityReport.valid ? 'VERIFIED (100% Tamper Proof)' : 'COMPROMISED'}</span>
-                </p>
-                <p className="text-[11px] text-stone-600 mt-1">
-                  Inspected {integrityReport.totalChecked || 0} event chains across user actions and financial settlements.
-                </p>
-              </div>
-            ) : (
-              <p className="text-stone-400 italic">Click Verify Ledger to inspect cryptographic event chains.</p>
-            )}
-          </div>
-
-          <div className="bg-white rounded-3xl border border-stone-200 p-5 shadow-xs space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <h4 className="font-extrabold text-sm text-stone-900 flex items-center gap-2">
-                  <Activity className="w-4 h-4 text-blue-600" /> Real-time Outbox Queue
-                </h4>
-                <p className="text-xs text-stone-500 font-medium">Background transactional worker queue</p>
-              </div>
-
-              <button
-                type="button"
-                onClick={handleLoadOutbox}
-                disabled={isLoadingOutbox}
-                className="px-3.5 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-800 rounded-xl font-bold text-xs"
-              >
-                Refresh Queue
-              </button>
-            </div>
-
-            {outboxEvents.length === 0 ? (
-              <p className="text-stone-400 italic">All queued messages dispatched cleanly.</p>
-            ) : (
-              <div className="space-y-2 max-h-60 overflow-y-auto">
-                {outboxEvents.map((evt) => (
-                  <div key={evt.id} className="p-2.5 bg-stone-50 rounded-xl border border-stone-200 flex justify-between items-center text-[11px]">
-                    <div>
-                      <span className="font-bold text-stone-800">{evt.eventType}</span>
-                      <span className="text-stone-400 ml-2">Attempts: {evt.retryCount || 0}</span>
-                    </div>
-                    <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 font-extrabold text-[10px]">
-                      {evt.status}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
+        <StaffActivityLogHub />
       )}
+
+      
 
       {/* Real-Time Gmail OTP Verification Modal for Admin Email Change */}
       {showEmailOtpModal && (
@@ -1104,9 +1052,22 @@ export const OwnerProfileView: React.FC = () => {
             </div>
 
             {otpModalError && (
-              <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl text-xs font-semibold flex items-center gap-2 animate-in fade-in">
-                <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
-                <span>{otpModalError}</span>
+              <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl text-xs font-semibold flex items-center justify-between gap-2 animate-shake">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+                  <span>{otpModalError}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEmailOtpCode('');
+                    setOtpModalError(null);
+                  }}
+                  className="px-2 py-0.5 rounded-lg bg-white border border-rose-200 text-rose-900 font-bold text-[10px] hover:bg-rose-100 transition-all cursor-pointer inline-flex items-center gap-1 shrink-0"
+                >
+                  <RotateCcw className="w-2.5 h-2.5 text-rose-600" />
+                  <span>Clear</span>
+                </button>
               </div>
             )}
 
@@ -1128,6 +1089,21 @@ export const OwnerProfileView: React.FC = () => {
                     autoFocus={true}
                   />
                 </div>
+                {emailOtpCode.length > 0 && (
+                  <div className="flex justify-end mt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEmailOtpCode('');
+                        setOtpModalError(null);
+                      }}
+                      className="text-stone-500 hover:text-red-700 text-[11px] font-medium inline-flex items-center gap-1 transition-colors cursor-pointer"
+                    >
+                      <RotateCcw className="w-3 h-3" />
+                      <span>Clear PIN</span>
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center justify-between text-xs text-stone-500 font-medium">

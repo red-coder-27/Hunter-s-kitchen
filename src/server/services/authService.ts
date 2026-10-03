@@ -5,9 +5,10 @@ import { db } from '../db';
 import { auditService } from './auditService';
 import { config } from '../config/config';
 import { emailService } from './emailService';
-import { redisService } from './redisService';
 import { UnauthorizedError, ForbiddenError, ValidationError, NotFoundError } from '../errors/AppError';
 import { User, UserRole, StaffSubRole, Address } from '../../types';
+import { sanitizeAndValidateRegistration, validateAndSanitizeEmail, normalizeEmail } from '../utils/sanitizer';
+import { redisService } from './redisService';
 
 export interface JWTPayload {
   userId: string;
@@ -78,9 +79,10 @@ export class AuthService {
     return { token, expiresAt };
   }
 
-  // Verify JWT token signature and revocation
+  // Synchronous token verification (with L1 memory revocation check)
   public verifyToken(token: string): JWTPayload {
-    if (this.revokedTokens.has(token)) {
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    if (this.revokedTokens.has(token) || this.revokedTokens.has(tokenHash)) {
       throw new UnauthorizedError('Session has been revoked. Please log in again.');
     }
 
@@ -95,6 +97,22 @@ export class AuthService {
     }
   }
 
+  // Asynchronous token verification with persistent Redis L2 revocation check
+  public async verifyTokenAsync(token: string): Promise<JWTPayload> {
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    if (this.revokedTokens.has(token) || this.revokedTokens.has(tokenHash)) {
+      throw new UnauthorizedError('Session has been revoked. Please log in again.');
+    }
+
+    const isRevokedInRedis = await redisService.exists(`revoked_jwt:${tokenHash}`);
+    if (isRevokedInRedis) {
+      this.revokedTokens.add(tokenHash);
+      throw new UnauthorizedError('Session has been revoked. Please log in again.');
+    }
+
+    return this.verifyToken(token);
+  }
+
   // Customer registration / sign-up with password, contact details & initial delivery address
   public async register(
     payload: {
@@ -106,62 +124,43 @@ export class AuthService {
     },
     context: { ip: string; requestId: string; userAgent?: string }
   ): Promise<AuthSessionResult> {
-    const name = (payload.name || '').trim();
-    const email = (payload.email || '').trim().toLowerCase();
-    const phone = (payload.phone || '').trim();
-    const password = payload.password || '';
+    // Enterprise-grade sanitization and strict format validation
+    const sanitized = sanitizeAndValidateRegistration(payload);
 
-    if (!name) {
-      throw new ValidationError('Full name is required');
-    }
-    if (!email || !email.includes('@')) {
-      throw new ValidationError('A valid email address is required');
-    }
-    if (!phone) {
-      throw new ValidationError('Phone number is required');
-    }
-    if (!password || password.length < 6) {
-      throw new ValidationError('Password must be at least 6 characters long');
-    }
-
-    const existingUser = db.getUserByEmail(email);
+    // Prevent duplicate accounts by email
+    const existingUser = await db.getUserByEmail(sanitized.email);
     if (existingUser) {
       throw new ValidationError('An account with this email address already exists. Please sign in instead.');
     }
 
-    // Create user in database with password
-    const newUser = db.createUser({
-      name,
-      email,
-      phone,
+    // Prevent duplicate accounts by phone number
+    const allUsers = await db.getUsers();
+    const existingPhone = allUsers.find((u) => u.phone === sanitized.phone);
+    if (existingPhone) {
+      throw new ValidationError('This mobile number is already linked to an existing account. Please sign in or use another number.');
+    }
+
+    // Create user in PostgreSQL with hashed credentials
+    const newUser = await db.createUser({
+      name: sanitized.name,
+      email: sanitized.email,
+      phone: sanitized.phone,
       role: 'CUSTOMER',
-      avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=ea4335&color=fff`,
+      avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(sanitized.name)}&background=ea4335&color=fff`,
       status: 'ACTIVE',
       restaurantId: 'rest_hunter_01',
       permissions: [],
-      password
+      password: sanitized.password
     });
 
-    // Save initial address if provided
-    if (payload.address && (payload.address.street || payload.address.area || payload.address.doorNo)) {
-      db.saveAddress(newUser.id, {
-        name,
-        phone,
-        doorNo: payload.address.doorNo || '',
-        street: payload.address.street || '',
-        area: payload.address.area || '',
-        city: payload.address.city || 'Coimbatore',
-        pincode: payload.address.pincode || '641018',
-        landmark: payload.address.landmark || '',
-        coordinates: payload.address.coordinates || '',
-        type: payload.address.type || 'HOME',
-        isDefault: true
-      });
+    // Save initial validated delivery address if provided
+    if (sanitized.address) {
+      await db.saveAddress(newUser.id, sanitized.address as Omit<Address, 'id'>);
     }
 
     const { token, expiresAt } = this.generateToken(newUser);
 
-    auditService.log({
+    await auditService.log({
       actorId: newUser.id,
       actorName: newUser.name,
       actorRole: newUser.role,
@@ -193,11 +192,11 @@ export class AuthService {
       throw new ValidationError('Email and password are required');
     }
 
-    const user = db.getUserByEmail(email);
-    const cred = db.getAuthCredentialsByEmail(email);
+    const user = await db.getUserByEmail(email);
+    const cred = await db.getAuthCredentialsByEmail(email);
 
     if (!user) {
-      auditService.log({
+      await auditService.log({
         actorId: 'unknown',
         actorName: 'Unknown User',
         actorRole: 'CUSTOMER',
@@ -232,10 +231,10 @@ export class AuthService {
 
     if (!cred || !isPasswordValid) {
       if (cred) {
-        db.recordLoginAttempt(email, false);
+        await db.recordLoginAttempt(email, false);
       }
 
-      auditService.log({
+      await auditService.log({
         actorId: user.id,
         actorName: user.name,
         actorRole: user.role,
@@ -266,11 +265,11 @@ export class AuthService {
     }
 
     // Reset failed attempts on success
-    db.recordLoginAttempt(email, true);
+    await db.recordLoginAttempt(email, true);
 
     const { token, expiresAt } = this.generateToken(user);
 
-    auditService.log({
+    await auditService.log({
       actorId: user.id,
       actorName: user.name,
       actorRole: user.role,
@@ -290,17 +289,25 @@ export class AuthService {
   }
 
   // Revoke session token
-  public logout(
+  public async logout(
     token?: string,
     user?: User,
     context?: { ip?: string; requestId?: string }
-  ): void {
+  ): Promise<void> {
     if (token) {
       this.revokedTokens.add(token);
+      try {
+        const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+        this.revokedTokens.add(tokenHash);
+        // Persist revoked token hash in Redis cache for 24h
+        await redisService.set(`revoked_jwt:${tokenHash}`, '1', 24 * 60 * 60);
+      } catch {
+        // Fallback gracefully if Redis is momentarily unavailable
+      }
     }
 
     if (user) {
-      auditService.log({
+      await auditService.log({
         actorId: user.id,
         actorName: user.name,
         actorRole: user.role,
@@ -314,24 +321,24 @@ export class AuthService {
   }
 
   // Request password reset token
-  public forgotPassword(
+  public async forgotPassword(
     emailRaw: string,
     context: { ip: string; requestId: string }
-  ): { message: string; resetToken?: string } {
+  ): Promise<{ message: string; resetToken?: string }> {
     const email = (emailRaw || '').trim().toLowerCase();
     if (!email) {
       throw new ValidationError('Email is required');
     }
 
-    const user = db.getUserByEmail(email);
+    const user = await db.getUserByEmail(email);
     let generatedToken: string | undefined;
 
     if (user && user.status === 'ACTIVE') {
       generatedToken = crypto.randomBytes(24).toString('hex');
       const oneHourMs = 60 * 60 * 1000;
-      db.setResetPasswordToken(email, generatedToken, oneHourMs);
+      await db.setResetPasswordToken(email, generatedToken, oneHourMs);
 
-      auditService.log({
+      await auditService.log({
         actorId: user.id,
         actorName: user.name,
         actorRole: user.role,
@@ -367,15 +374,15 @@ export class AuthService {
     }
 
     const newHash = await bcrypt.hash(newPassword, 10);
-    const userId = db.verifyAndConsumeResetToken(token, newHash);
+    const userId = await db.verifyAndConsumeResetToken(token, newHash);
 
     if (!userId) {
       throw new ValidationError('Invalid or expired password reset token');
     }
 
-    const user = db.getUserById(userId);
+    const user = await db.getUserById(userId);
     if (user) {
-      auditService.log({
+      await auditService.log({
         actorId: user.id,
         actorName: user.name,
         actorRole: user.role,
@@ -407,13 +414,13 @@ export class AuthService {
     }
 
     const newHash = await bcrypt.hash(password, 10);
-    const activatedUser = db.acceptInvite(token, newHash);
+    const activatedUser = await db.acceptInvite(token, newHash);
 
     if (!activatedUser) {
       throw new ValidationError('Invalid or expired invitation token');
     }
 
-    auditService.log({
+    await auditService.log({
       actorId: activatedUser.id,
       actorName: activatedUser.name,
       actorRole: activatedUser.role,
@@ -436,20 +443,34 @@ export class AuthService {
     purpose: 'LOGIN' | 'FORGOT_PASSWORD' | 'EMAIL_CHANGE' = 'FORGOT_PASSWORD',
     context: { ip: string; requestId: string }
   ) {
-    const email = (emailRaw || '').trim().toLowerCase();
-    if (!email) {
-      throw new ValidationError('Valid email address is required');
+    const emailValidation = validateAndSanitizeEmail(emailRaw);
+    if (!emailValidation.isValid) {
+      throw new ValidationError(emailValidation.error || 'Please enter a valid Gmail address');
     }
 
-    const user = db.getUserByEmail(email);
+    const email = emailValidation.value;
+    if (!email.endsWith('@gmail.com') && !email.endsWith('@googlemail.com')) {
+      throw new ValidationError('Please enter a valid Gmail address');
+    }
+
+    // Gmail username cannot start with dot, end with dot, or have consecutive dots
+    const [localPart] = email.split('@');
+    if (localPart.startsWith('.') || localPart.endsWith('.') || localPart.includes('..')) {
+      throw new ValidationError('Please enter a valid Gmail address');
+    }
+
+    // Normalize Gmail address by stripping dots (e.g., john.smith@gmail.com -> johnsmith@gmail.com)
+    const normalizedEmail = normalizeEmail(email);
+
+    const user = await db.getUserByEmail(normalizedEmail);
     const dispatch = await emailService.sendOtpEmail({
-      email,
+      email: normalizedEmail,
       purpose,
       userName: user?.name
     });
 
     if (user) {
-      auditService.log({
+      await auditService.log({
         actorId: user.id,
         actorName: user.name,
         actorRole: user.role,
@@ -458,7 +479,7 @@ export class AuthService {
         resourceId: user.id,
         requestId: context.requestId,
         ipAddress: context.ip,
-        newValue: { channel: dispatch.channel, purpose }
+        newValue: { channel: dispatch.channel, purpose, targetEmail: normalizedEmail }
       });
     }
 
@@ -471,27 +492,35 @@ export class AuthService {
     otpRaw: string,
     context: { ip: string; requestId: string; userAgent?: string }
   ): Promise<AuthSessionResult> {
-    const email = (emailRaw || '').trim().toLowerCase();
+    const emailValidation = validateAndSanitizeEmail(emailRaw);
+    if (!emailValidation.isValid) {
+      throw new ValidationError(emailValidation.error || 'Please enter a valid Gmail address');
+    }
+
+    const email = emailValidation.value;
     const otp = (otpRaw || '').trim();
 
-    if (!email || !otp) {
-      throw new ValidationError('Email and 6-digit OTP code are required');
+    if (!otp) {
+      throw new ValidationError('6-digit verification PIN code is required');
     }
 
-    const isValid = await emailService.verifyOtp(email, otp, 'LOGIN');
-    if (!isValid) {
-      throw new ValidationError('Invalid or expired 6-digit verification code. Please request a new code.');
+    // Normalize Gmail address so dots resolve to the same single account
+    const normalizedEmail = normalizeEmail(email);
+
+    const verification = await emailService.verifyOtpDetailed(normalizedEmail, otp, 'LOGIN');
+    if (!verification.valid) {
+      throw new ValidationError(verification.message || 'Incorrect verification code. Please check your Gmail and try again.');
     }
 
-    let user = db.getUserByEmail(email);
+    let user = await db.getUserByEmail(normalizedEmail);
     if (!user) {
       // Auto-provision verified customer account if logging in for the first time
-      user = db.createUser({
-        name: email.split('@')[0],
-        email: email,
+      user = await db.createUser({
+        name: normalizedEmail.split('@')[0],
+        email: normalizedEmail,
         phone: '+91 90000 00000',
         role: 'CUSTOMER',
-        avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(email.split('@')[0])}&background=ea4335&color=fff`,
+        avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(normalizedEmail.split('@')[0])}&background=ea4335&color=fff`,
         status: 'ACTIVE',
         restaurantId: 'rest_hunter_01',
         permissions: [],
@@ -509,7 +538,7 @@ export class AuthService {
 
     const { token, expiresAt } = this.generateToken(user);
 
-    auditService.log({
+    await auditService.log({
       actorId: user.id,
       actorName: user.name,
       actorRole: user.role,
@@ -541,18 +570,18 @@ export class AuthService {
       throw new ValidationError('Email and 6-digit OTP are required');
     }
 
-    const isValid = await emailService.verifyOtp(email, otp, 'FORGOT_PASSWORD');
-    if (!isValid) {
-      throw new ValidationError('Invalid or expired 6-digit verification code. Please request a new code.');
+    const verification = await emailService.verifyOtpDetailed(email, otp, 'FORGOT_PASSWORD');
+    if (!verification.valid) {
+      throw new ValidationError(verification.message || 'Incorrect verification code. Please check your Gmail and try again.');
     }
 
     // Generate single-use password reset authorization token valid for 15 mins
     const resetToken = `otp_rst_${crypto.randomBytes(20).toString('hex')}`;
-    db.setResetPasswordToken(email, resetToken, 15 * 60 * 1000);
+    await db.setResetPasswordToken(email, resetToken, 15 * 60 * 1000);
 
-    const user = db.getUserByEmail(email);
+    const user = await db.getUserByEmail(email);
     if (user) {
-      auditService.log({
+      await auditService.log({
         actorId: user.id,
         actorName: user.name,
         actorRole: user.role,
@@ -590,11 +619,11 @@ export class AuthService {
     const sub = identity.sub.trim();
 
     // 1. Authoritative lookup by googleId (sub)
-    let user = db.getUserByGoogleId(sub);
+    let user = await db.getUserByGoogleId(sub);
 
     if (!user) {
       // 2. Lookup by verified email for account linking
-      const existingUserByEmail = db.getUserByEmail(email);
+      const existingUserByEmail = await db.getUserByEmail(email);
 
       if (existingUserByEmail) {
         // If already linked to a different googleId, reject with ForbiddenError to prevent account collision
@@ -603,15 +632,15 @@ export class AuthService {
         }
 
         // Link verified Google identity to existing local account
-        db.updateUser(existingUserByEmail.id, {
+        await db.updateUser(existingUserByEmail.id, {
           googleId: sub,
           emailVerified: true,
           avatar: existingUserByEmail.avatar || identity.picture
         });
-        user = db.getUserById(existingUserByEmail.id)!;
+        user = (await db.getUserById(existingUserByEmail.id))!;
       } else {
         // 3. Auto-provision new customer account with verified Google identity
-        user = db.createUser({
+        user = await db.createUser({
           name: identity.name || email.split('@')[0],
           email: email,
           phone: '+91 90000 00000',
@@ -638,7 +667,7 @@ export class AuthService {
     const { token, expiresAt } = this.generateToken(user);
 
     // Audit log only non-sensitive metadata (never log tokens, codes, or secrets)
-    auditService.log({
+    await auditService.log({
       actorId: user.id,
       actorName: user.name,
       actorRole: user.role,
@@ -664,4 +693,3 @@ export class AuthService {
 }
 
 export const authService = new AuthService();
-

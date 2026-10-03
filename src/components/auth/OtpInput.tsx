@@ -24,11 +24,20 @@ export const OtpInput: React.FC<OtpInputProps> = ({
   // Split value into array of individual characters
   const digits = Array.from({ length }, (_, i) => value[i] || '');
 
+  // Auto focus first input on mount
   useEffect(() => {
     if (autoFocus && inputRefs.current[0]) {
       inputRefs.current[0]?.focus();
     }
   }, [autoFocus]);
+
+  // When error occurs, focus and select the first input so user can instantly retype
+  useEffect(() => {
+    if (hasError && inputRefs.current[0]) {
+      inputRefs.current[0]?.focus();
+      inputRefs.current[0]?.select();
+    }
+  }, [hasError]);
 
   const handleInputChange = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
     const rawVal = e.target.value;
@@ -44,10 +53,10 @@ export const OtpInput: React.FC<OtpInputProps> = ({
     }
 
     if (cleanDigits.length > 1) {
-      // If user typed a new digit while the box had a previous digit (e.g. "48")
-      // Take the last entered character if length is 2, otherwise treat as paste
+      // If user typed a new digit into an already-filled box
       if (cleanDigits.length === 2 && digits[index]) {
-        const charToUse = cleanDigits.replace(digits[index], '') || cleanDigits[cleanDigits.length - 1];
+        // Take the newly typed digit (the last character)
+        const charToUse = cleanDigits.slice(-1);
         const nextDigits = [...digits];
         nextDigits[index] = charToUse;
         const newOtp = nextDigits.join('');
@@ -135,7 +144,7 @@ export const OtpInput: React.FC<OtpInputProps> = ({
   };
 
   return (
-    <div className="flex items-center justify-center gap-2 sm:gap-3 w-full max-w-sm mx-auto">
+    <div className={`flex items-center justify-center gap-1.5 sm:gap-2.5 w-full max-w-sm mx-auto select-none ${hasError ? 'animate-shake' : ''}`}>
       {Array.from({ length }).map((_, index) => {
         const isFilled = Boolean(digits[index]);
         return (
@@ -155,12 +164,14 @@ export const OtpInput: React.FC<OtpInputProps> = ({
             onKeyDown={(e) => handleKeyDown(index, e)}
             onPaste={handlePaste}
             onFocus={(e) => e.target.select()}
-            className={`w-11 h-13 sm:w-12 sm:h-14 text-center text-xl sm:text-2xl font-mono font-bold rounded-xl border transition-all duration-150 outline-none select-all ${
+            aria-label={`Digit ${index + 1} of ${length}`}
+            aria-invalid={hasError}
+            className={`w-10 sm:w-12 h-12 sm:h-14 shrink-0 text-center text-xl sm:text-2xl font-mono font-bold rounded-xl border transition-all duration-200 outline-none select-all ${
               hasError
-                ? 'border-rose-400 bg-rose-50/50 text-rose-900 focus:border-red-600 focus:ring-4 focus:ring-red-500/15'
+                ? 'border-rose-400 bg-rose-50/80 text-rose-950 ring-2 ring-rose-500/20 focus:border-rose-600 focus:ring-4 focus:ring-rose-500/30'
                 : isFilled
-                ? 'border-stone-400 bg-stone-50/60 text-stone-900 font-black shadow-xs focus:border-red-600 focus:ring-4 focus:ring-red-500/15 focus:bg-white'
-                : 'border-stone-300 bg-stone-50/80 text-stone-900 hover:border-stone-400 focus:border-red-600 focus:bg-white focus:ring-4 focus:ring-red-500/15 focus:shadow-sm'
+                ? 'border-red-500/40 bg-white text-stone-900 font-black shadow-xs focus:border-red-600 focus:ring-4 focus:ring-red-500/20'
+                : 'border-stone-300 bg-stone-50/70 text-stone-800 hover:border-stone-400 focus:border-red-600 focus:bg-white focus:ring-4 focus:ring-red-500/20 focus:shadow-xs'
             } disabled:opacity-40 disabled:cursor-not-allowed`}
           />
         );

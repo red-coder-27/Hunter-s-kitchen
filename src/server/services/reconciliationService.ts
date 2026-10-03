@@ -4,10 +4,10 @@ import { logger } from '../utils/logger';
 
 export class ReconciliationService {
   /**
-   * Scans existing orders and state transitions to identify inconsistencies.
+   * Scans PostgreSQL orders and state transitions to identify inconsistencies.
    */
-  runAudit(): AnomalyReport {
-    const orders = db.getOrders();
+  async runAudit(): Promise<AnomalyReport> {
+    const orders = await db.getOrders();
     const issues: AnomalyReport['issues'] = [];
     const now = Date.now();
 
@@ -98,36 +98,35 @@ export class ReconciliationService {
           type: 'DUPLICATE_ORDER_ITEMS',
           severity: 'LOW',
           orderId: order.id,
-          description: `Order #${order.orderNumber} contains identical line items that were not aggregated into a single item with quantity.`,
-          suggestedAction: 'Ensure client-side cart consolidates identical line items.'
+          description: `Order #${order.orderNumber} contains duplicate items with identical customizations. Consider merging quantities.`,
+          suggestedAction: 'Review item consolidation.'
         });
       }
 
-      // 8. Stale pending order (> 20 minutes in PLACED state)
+      // 8. Stale pending orders (> 20 mins in PLACED state without confirmation)
       if (order.status === 'PLACED') {
-        const orderAgeMinutes = (now - new Date(order.createdAt).getTime()) / (1000 * 60);
-        if (orderAgeMinutes > 20) {
+        const ageMs = now - new Date(order.createdAt).getTime();
+        if (ageMs > 20 * 60 * 1000) {
           issues.push({
             type: 'STALE_PENDING_ORDER',
-            severity: 'HIGH',
+            severity: 'MEDIUM',
             orderId: order.id,
-            description: `Order #${order.orderNumber} has remained in PLACED state for ${Math.round(orderAgeMinutes)} minutes without acceptance.`,
-            suggestedAction: 'Alert kitchen manager or auto-cancel order with customer notification.'
+            description: `Order #${order.orderNumber} has been in PLACED state for > 20 minutes without kitchen acceptance.`,
+            suggestedAction: 'Alert kitchen staff and verify restaurant tablet connection.'
           });
         }
       }
 
-      // 9. Stale assigned order (> 45 minutes in ASSIGNED state without pick-up)
+      // 9. Stale assigned orders (> 45 mins in ASSIGNED state without pickup)
       if (order.status === 'ASSIGNED') {
-        const assignedTime = order.events.find((e) => e.status === 'ASSIGNED')?.timestamp || order.createdAt;
-        const assignedAgeMinutes = (now - new Date(assignedTime).getTime()) / (1000 * 60);
-        if (assignedAgeMinutes > 45) {
+        const ageMs = now - new Date(order.createdAt).getTime();
+        if (ageMs > 45 * 60 * 1000) {
           issues.push({
             type: 'STALE_ASSIGNED_ORDER',
-            severity: 'MEDIUM',
+            severity: 'HIGH',
             orderId: order.id,
-            description: `Order #${order.orderNumber} was assigned to ${order.assignedDeliveryPartnerName || 'a driver'} ${Math.round(assignedAgeMinutes)} minutes ago but has not been picked up.`,
-            suggestedAction: 'Contact delivery partner or reassign to an active rider.'
+            description: `Order #${order.orderNumber} has been in ASSIGNED state for > 45 minutes. Rider has not picked up.`,
+            suggestedAction: 'Contact assigned driver or reassign order to active online partner.'
           });
         }
       }
@@ -141,11 +140,11 @@ export class ReconciliationService {
     };
 
     if (issues.length > 0) {
-      logger.warn(`Reconciliation audit completed with ${issues.length} anomaly detected`, {
-        anomaliesCount: issues.length
+      logger.warn('Reconciliation audit detected anomalies', {
+        audited: orders.length,
+        anomalies: issues.length,
+        critical: issues.filter((i) => i.severity === 'CRITICAL').length
       });
-    } else {
-      logger.info(`Reconciliation audit completed successfully: 0 anomalies across ${orders.length} orders.`);
     }
 
     return report;

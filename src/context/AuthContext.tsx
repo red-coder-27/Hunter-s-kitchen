@@ -120,7 +120,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     password: string;
     address?: Partial<import('../types').Address>;
   }): Promise<User> => {
-    setIsLoading(true);
     try {
       const res = await apiService.register(payload);
       if (!res?.user) {
@@ -133,13 +132,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setLoginSuccessUser(null);
       setCurrentUser(null);
       throw err;
-    } finally {
-      setIsLoading(false);
     }
   };
 
   const login = async (email: string, password: string): Promise<User> => {
-    setIsLoading(true);
     try {
       const res = await apiService.login(email, password);
       if (!res?.user) {
@@ -152,13 +148,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setLoginSuccessUser(null);
       setCurrentUser(null);
       throw err;
-    } finally {
-      setIsLoading(false);
     }
   };
 
   const loginWithOtp = async (email: string, otp: string): Promise<User> => {
-    setIsLoading(true);
     try {
       const res = await apiService.loginWithOtp(email, otp);
       if (!res?.user) {
@@ -171,8 +164,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setLoginSuccessUser(null);
       setCurrentUser(null);
       throw err;
-    } finally {
-      setIsLoading(false);
     }
   };
 

@@ -1,12 +1,13 @@
 import { Server } from 'http';
 import { outboxWorker } from '../workers/outboxWorker';
 import { eventHub } from '../services/eventHub';
+import { postgresDb } from '../db/postgres';
 import { logger } from './logger';
 
 export function setupGracefulShutdown(server: Server) {
   let isShuttingDown = false;
 
-  const handleShutdown = (signal: string) => {
+  const handleShutdown = async (signal: string) => {
     if (isShuttingDown) return;
     isShuttingDown = true;
 
@@ -18,7 +19,14 @@ export function setupGracefulShutdown(server: Server) {
     // 2. Terminate real-time SSE streams cleanly
     eventHub.closeAll();
 
-    // 3. Stop accepting new HTTP connections and drain active ones
+    // 3. Drain and close PostgreSQL connection pool
+    try {
+      await postgresDb.close();
+    } catch (e: any) {
+      logger.error('Error closing PostgreSQL pool during shutdown', { error: e.message });
+    }
+
+    // 4. Stop accepting new HTTP connections and drain active ones
     server.close((err) => {
       if (err) {
         logger.error('Error closing HTTP server during shutdown', err);

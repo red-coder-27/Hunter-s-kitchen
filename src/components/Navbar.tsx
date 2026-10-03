@@ -16,7 +16,6 @@ import {
   Loader2, 
   Trash2, 
   Edit2, 
-  LogOut, 
   User as UserIcon,
   LayoutDashboard,
   ClipboardList,
@@ -45,7 +44,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onNotificationsClick, 
   onCartClick 
 }) => {
-  const { settings, currentRole, currentUser, logout } = useAuth();
+  const { settings, currentRole, currentUser } = useAuth();
   const { 
     selectedAddress, 
     savedAddresses, 
@@ -262,10 +261,10 @@ export const Navbar: React.FC<NavbarProps> = ({
   } else if (currentRole === 'STAFF') {
     const staffRole = currentUser?.staffRole || 'GENERAL_MANAGER';
     const isManager = staffRole === 'KITCHEN_MANAGER' || staffRole === 'GENERAL_MANAGER';
-    const canAccessOrderDesk = isManager || staffRole === 'ORDER_BILLER' || staffRole === 'FRONT_DESK';
-    const canAccessChefStation = isManager || staffRole === 'KITCHEN_CHEF' || staffRole === 'HEAD_CHEF' || staffRole === 'LINE_COOK';
-    const canAccessDispatch = isManager || staffRole === 'STORE_DISPATCHER';
-    const canAccessInventory = isManager || staffRole === 'KITCHEN_CHEF' || staffRole === 'HEAD_CHEF';
+    const canAccessOrderDesk = true;
+    const canAccessChefStation = true;
+    const canAccessDispatch = isManager;
+    const canAccessInventory = isManager;
 
     desktopTabs.push(
       { id: 'staff_dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-4 h-4" /> }
@@ -306,21 +305,6 @@ export const Navbar: React.FC<NavbarProps> = ({
               <span className="text-xl">🍳</span>
               <span className="font-serif font-black text-stone-900">Hunter's Kitchen</span>
             </button>
-            {currentUser && (
-              <span className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border uppercase tracking-wider ${
-                currentUser.role === 'OWNER'
-                  ? 'bg-amber-100 text-amber-800 border-amber-300'
-                  : currentUser.role === 'STAFF'
-                  ? 'bg-red-100 text-red-800 border-red-300'
-                  : currentUser.role === 'DELIVERY_PARTNER'
-                  ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
-                  : 'bg-stone-100 text-stone-700 border-stone-300'
-              }`}>
-                {currentUser.role === 'STAFF' && currentUser.staffRole
-                  ? currentUser.staffRole.replace(/_/g, ' ')
-                  : currentUser.role.replace(/_/g, ' ')}
-              </span>
-            )}
           </div>
 
           {/* Desktop Navigation Tabs (Professional Segmented Bar) */}
@@ -382,7 +366,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               </button>
             )}
 
-            {currentUser && (
+            {currentUser && currentUser.role !== 'CUSTOMER' && (
               <div className="hidden lg:flex items-center gap-2 pl-1 pr-2 py-1 rounded-xl bg-stone-50 border border-stone-200 text-xs">
                 <div className="w-6 h-6 rounded-lg bg-stone-900 text-white flex items-center justify-center font-bold text-[10px]">
                   {currentUser.name?.charAt(0).toUpperCase() || 'U'}
@@ -391,17 +375,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                   {currentUser.name}
                 </span>
               </div>
-            )}
-
-            {currentUser && (
-              <button
-                onClick={() => logout()}
-                title={`Log out (${currentUser.name})`}
-                className="inline-flex items-center space-x-1.5 px-3 py-1.5 rounded-xl bg-stone-100 hover:bg-red-50 text-stone-700 hover:text-red-700 border border-stone-200 hover:border-red-200 text-xs font-semibold transition-colors cursor-pointer"
-              >
-                <LogOut className="w-3.5 h-3.5 shrink-0" />
-                <span className="hidden sm:inline">Logout</span>
-              </button>
             )}
           </div>
         </div>

@@ -7,8 +7,11 @@ import { MenuItem, Order } from './types';
 import { Navbar } from './components/Navbar';
 import { BottomNav } from './components/BottomNav';
 import { FloatingCartBar } from './components/FloatingCartBar';
+import { FloatingLiveOrderBar } from './components/FloatingLiveOrderBar';
+import { apiService } from './services/api';
 import { LoginPage } from './components/auth/LoginPage';
 import { LoginSuccessAnimation } from './components/auth/LoginSuccessAnimation';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { Loader2, Flame } from 'lucide-react';
 
 // Customer Views
@@ -50,25 +53,83 @@ export default function App() {
 
   // Navigation State
   const [currentTab, setCurrentTab] = useState('home');
+  const [ownerInitialOrderFilter, setOwnerInitialOrderFilter] = useState<string>('ALL');
+
+  const handleOwnerNavigateTab = (tab: string, filter?: string) => {
+    if (filter) setOwnerInitialOrderFilter(filter);
+    setCurrentTab(tab);
+  };
   const [selectedFoodItem, setSelectedFoodItem] = useState<MenuItem | null>(null);
-  const [trackingOrderId, setTrackingOrderId] = useState<string | null>(null);
+  const [trackingOrderId, setTrackingOrderId] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('hk_active_tracking_order_id');
+    }
+    return null;
+  });
   const [isCheckoutFlow, setIsCheckoutFlow] = useState(false);
   const [isAddressSelection, setIsAddressSelection] = useState(false);
 
-  // Route automatically to role home tab upon authenticating or role switch
-  useEffect(() => {
+  const handleOpenTracking = (orderId: string) => {
+    setTrackingOrderId(orderId);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('hk_active_tracking_order_id', orderId);
+    }
+  };
+
+  const handleCloseTracking = (keepPersistent = true) => {
     setTrackingOrderId(null);
+    if (!keepPersistent && typeof window !== 'undefined') {
+      localStorage.removeItem('hk_active_tracking_order_id');
+    }
+  };
+
+  // Route automatically upon authenticating or role switch, and restore active in-progress orders
+  useEffect(() => {
     setSelectedFoodItem(null);
     if (!currentUser) return;
 
     if (currentUser.role === 'OWNER' || currentUser.role === 'ADMIN') {
+      setTrackingOrderId(null);
+      localStorage.removeItem('hk_active_tracking_order_id');
       setCurrentTab('owner_dashboard');
     } else if (currentUser.role === 'STAFF') {
+      setTrackingOrderId(null);
+      localStorage.removeItem('hk_active_tracking_order_id');
       setCurrentTab('staff_dashboard');
     } else if (currentUser.role === 'DELIVERY_PARTNER') {
+      setTrackingOrderId(null);
+      localStorage.removeItem('hk_active_tracking_order_id');
       setCurrentTab('delivery_dashboard');
     } else {
-      setCurrentTab('home');
+      // CUSTOMER ROLE:
+      const savedTrackingId = typeof window !== 'undefined' ? localStorage.getItem('hk_active_tracking_order_id') : null;
+      if (savedTrackingId) {
+        apiService.getOrderById(savedTrackingId).then((order) => {
+          if (order && order.status !== 'DELIVERED' && order.status !== 'CANCELLED' && order.status !== 'REJECTED') {
+            setTrackingOrderId(order.id);
+            setCurrentTab('orders');
+          } else {
+            localStorage.removeItem('hk_active_tracking_order_id');
+            setTrackingOrderId(null);
+          }
+        }).catch(() => {
+          setTrackingOrderId(savedTrackingId);
+        });
+      } else {
+        // Check if customer has any active in-flight order
+        apiService.getOrders({ role: 'CUSTOMER', userId: currentUser.id }).then((orders) => {
+          if (Array.isArray(orders)) {
+            const active = orders.find(
+              (o) => o.status !== 'DELIVERED' && o.status !== 'CANCELLED' && o.status !== 'REJECTED'
+            );
+            if (active) {
+              setTrackingOrderId(active.id);
+              localStorage.setItem('hk_active_tracking_order_id', active.id);
+              setCurrentTab('orders');
+            }
+          }
+        }).catch(() => {});
+      }
     }
   }, [currentUser?.id, currentUser?.role]);
 
@@ -113,7 +174,7 @@ export default function App() {
         return (
           <OrderTrackingView
             orderId={trackingOrderId}
-            onBack={() => setTrackingOrderId(null)}
+            onBack={() => handleCloseTracking(true)}
           />
         );
       }
@@ -144,22 +205,16 @@ export default function App() {
             />
           );
         case 'cart':
-          return (
-            <CartView
-              onProceedToCheckout={() => setCurrentTab('checkout')}
-              onBrowseMenu={() => setCurrentTab('home')}
-            />
-          );
         case 'checkout':
           return (
             <CheckoutView
               onBackToCart={() => {
                 setIsCheckoutFlow(false);
-                setCurrentTab('cart');
+                setCurrentTab('home');
               }}
               onOrderSuccess={(order: Order) => {
                 setIsCheckoutFlow(false);
-                setTrackingOrderId(order.id);
+                handleOpenTracking(order.id);
                 setCurrentTab('orders');
               }}
               onCheckoutFlowChange={(isFlow: boolean) => setIsCheckoutFlow(isFlow)}
@@ -169,7 +224,7 @@ export default function App() {
         case 'orders':
           return (
             <CustomerOrderHistory
-              onSelectOrderToTrack={(orderId) => setTrackingOrderId(orderId)}
+              onSelectOrderToTrack={(orderId) => handleOpenTracking(orderId)}
               onNavigateToCart={() => setCurrentTab('cart')}
             />
           );
@@ -178,6 +233,7 @@ export default function App() {
         default:
           return (
             <CustomerHome
+              currentTab={currentTab}
               onNavigateToCart={() => setCurrentTab('cart')}
               onNavigateToSearch={() => setCurrentTab('search')}
             />
@@ -193,12 +249,12 @@ export default function App() {
         case 'owner_dashboard':
           return (
             <OwnerDashboard
-              onNavigateTab={(tab) => setCurrentTab(tab)}
+              onNavigateTab={handleOwnerNavigateTab}
               onSelectOrder={(orderId) => setCurrentTab('owner_orders')}
             />
           );
         case 'owner_orders':
-          return <OwnerOrdersView />;
+          return <OwnerOrdersView initialStatusFilter={ownerInitialOrderFilter} />;
         case 'owner_menu':
           return <OwnerMenuView />;
         case 'owner_staff':
@@ -211,7 +267,7 @@ export default function App() {
         default:
           return (
             <OwnerDashboard
-              onNavigateTab={(tab) => setCurrentTab(tab)}
+              onNavigateTab={handleOwnerNavigateTab}
               onSelectOrder={(orderId) => setCurrentTab('owner_orders')}
             />
           );
@@ -248,6 +304,7 @@ export default function App() {
 
     return (
       <CustomerHome
+        currentTab={currentTab}
         onNavigateToCart={() => setCurrentTab('cart')}
         onNavigateToSearch={() => setCurrentTab('search')}
       />
@@ -257,15 +314,15 @@ export default function App() {
   return (
     <div className="min-h-screen bg-stone-50 font-sans text-stone-900 antialiased selection:bg-red-700 selection:text-white">
       {/* Top Navbar */}
-      {!(currentRole === 'CUSTOMER' && (isAddressSelection || isCheckoutFlow || trackingOrderId)) && (
+      {!(currentRole === 'CUSTOMER' && (isAddressSelection || trackingOrderId)) && (
         <Navbar 
           currentTab={currentTab}
           onTabChange={(tab) => {
-            setTrackingOrderId(null);
+            handleCloseTracking(true);
             setCurrentTab(tab);
           }}
           onCartClick={() => { 
-            setTrackingOrderId(null); 
+            handleCloseTracking(true); 
             setCurrentTab('cart'); 
           }} 
         />
@@ -273,7 +330,9 @@ export default function App() {
 
       {/* Main View Container */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-2 pb-20 md:pb-8">
-        {renderContent()}
+        <ErrorBoundary>
+          {renderContent()}
+        </ErrorBoundary>
       </main>
 
       {/* Food Customization Modal for Customer */}
@@ -288,7 +347,7 @@ export default function App() {
         />
       )}
 
-      {/* Customer Floating Bottom Cart Bar */}
+      {/* Floating Bottom Live Order Strip & Cart Bar Container (Cleanly Stacked) */}
       {currentRole === 'CUSTOMER' &&
         currentTab !== 'cart' &&
         currentTab !== 'checkout' &&
@@ -296,7 +355,13 @@ export default function App() {
         !isCheckoutFlow &&
         !isAddressSelection &&
         !isAddressModalOpen && (
-          <FloatingCartBar onNavigateToCart={() => setCurrentTab('cart')} />
+          <div className="fixed bottom-16 md:bottom-6 left-4 right-4 md:left-1/2 md:-translate-x-1/2 md:w-full md:max-w-xl z-50 pointer-events-none flex flex-col gap-2.5">
+            <FloatingLiveOrderBar
+              onOpenTracking={handleOpenTracking}
+              isTrackingOpen={!!trackingOrderId}
+            />
+            <FloatingCartBar onNavigateToCart={() => setCurrentTab('cart')} />
+          </div>
         )}
 
       {/* Mobile Bottom Navigation */}
@@ -304,7 +369,7 @@ export default function App() {
         <BottomNav
           currentTab={currentTab}
           onTabChange={(tab) => {
-            setTrackingOrderId(null);
+            handleCloseTracking(true);
             setCurrentTab(tab);
           }}
         />

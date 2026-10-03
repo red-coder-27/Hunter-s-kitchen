@@ -16,7 +16,7 @@ const ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   ACCEPTED: ['PREPARING', 'CANCELLED'],
   PREPARING: ['READY', 'CANCELLED'],
   READY: ['ASSIGNED', 'PICKED_UP', 'CANCELLED'],
-  ASSIGNED: ['PICKED_UP', 'CANCELLED'],
+  ASSIGNED: ['ASSIGNED', 'READY', 'PICKED_UP', 'CANCELLED'],
   PICKED_UP: ['OUT_FOR_DELIVERY', 'CANCELLED'],
   OUT_FOR_DELIVERY: ['DELIVERED', 'CANCELLED'],
   DELIVERED: [], // Terminal State
@@ -26,14 +26,14 @@ const ALLOWED_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
 
 export class OrderService {
   /**
-   * Validates cart items and securely recalculates prices server-side.
+   * Validates cart items and securely recalculates prices server-side against PostgreSQL.
    */
-  validateAndCalculateCart(items: any[]) {
+  async validateAndCalculateCart(items: any[]) {
     if (!items || items.length === 0) {
       throw new ValidationError('Cart cannot be empty');
     }
 
-    const settings = db.getSettings();
+    const settings = await db.getSettings();
     if (!settings.isOpen || settings.temporaryPause) {
       throw new ValidationError(
         settings.temporaryPause
@@ -46,7 +46,7 @@ export class OrderService {
     const orderItemSnapshots = [];
 
     for (const item of items) {
-      const dbItem = db.getMenuItemById(item.menuItem?.id || item.menuItemId);
+      const dbItem = await db.getMenuItemById(item.menuItem?.id || item.menuItemId);
       if (!dbItem || !dbItem.isAvailable) {
         throw new ValidationError(`"${item.menuItem?.name || item.name || 'Selected item'}" is currently unavailable or out of stock`);
       }
@@ -87,12 +87,12 @@ export class OrderService {
   }
 
   /**
-   * Atomic Order Creation with Outbox Event and Audit Log.
+   * Atomic Order Creation with PostgreSQL Transaction, Outbox Event and Audit Log.
    */
-  createOrder(payload: any, requestId: string): Order {
-    const { subtotal, deliveryFee, tax, grandTotal, orderItemSnapshots } = this.validateAndCalculateCart(payload.items);
+  async createOrder(payload: any, requestId: string): Promise<Order> {
+    const { subtotal, deliveryFee, tax, grandTotal, orderItemSnapshots } = await this.validateAndCalculateCart(payload.items);
 
-    const newOrder = db.createOrder({
+    const newOrder = await db.createOrder({
       customerId: payload.customerId || 'usr_guest',
       customerName: payload.customerName || 'Valued Customer',
       customerPhone: payload.customerPhone || '+91 90000 00000',
@@ -113,7 +113,7 @@ export class OrderService {
     });
 
     // Write transactional outbox event
-    outboxRepository.insert({
+    await outboxRepository.insert({
       id: `evt_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
       aggregateType: 'ORDER',
       aggregateId: newOrder.id,
@@ -131,7 +131,7 @@ export class OrderService {
     });
 
     // Write audit log
-    auditService.log({
+    await auditService.log({
       actorId: newOrder.customerId,
       actorName: newOrder.customerName,
       actorRole: 'CUSTOMER',
@@ -148,17 +148,17 @@ export class OrderService {
   }
 
   /**
-   * Transition Order Status with strict finite state machine validation and concurrency protection.
+   * Transition Order Status with strict finite state machine validation and PostgreSQL row lock protection.
    */
-  transitionStatus(
+  async transitionStatus(
     orderId: string, 
     nextStatus: OrderStatus, 
     actor: User, 
     requestId: string,
     metadata?: Record<string, any>,
     expectedVersion?: number
-  ): Order {
-    const order = db.getOrderById(orderId);
+  ): Promise<Order> {
+    const order = await db.getOrderById(orderId);
     if (!order) {
       throw new NotFoundError('Order', orderId);
     }
@@ -182,7 +182,7 @@ export class OrderService {
       );
     }
 
-    const updated = db.updateOrderStatus(orderId, nextStatus, actor, metadata);
+    const updated = await db.updateOrderStatus(orderId, nextStatus, actor, metadata);
     if (!updated) {
       throw new NotFoundError('Order', orderId);
     }
@@ -211,7 +211,7 @@ export class OrderService {
     };
 
     // Write transactional outbox event
-    outboxRepository.insert({
+    await outboxRepository.insert({
       id: `evt_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
       aggregateType: 'ORDER',
       aggregateId: order.id,
@@ -234,7 +234,7 @@ export class OrderService {
 
     // If order was delivered via Cash on Delivery, record separate COD_COLLECTED outbox event
     if (nextStatus === 'DELIVERED' && updated.paymentMethod === 'COD') {
-      outboxRepository.insert({
+      await outboxRepository.insert({
         id: `evt_cod_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
         aggregateType: 'ORDER',
         aggregateId: order.id,
@@ -256,15 +256,16 @@ export class OrderService {
     }
 
     // Write audit log
-    auditService.log({
+    const isReassign = currentStatus === 'ASSIGNED' && nextStatus === 'ASSIGNED';
+    await auditService.log({
       actorId: actor.id,
       actorName: actor.name,
-      actorRole: actor.role,
-      action: `TRANSITION_ORDER_${nextStatus}`,
+      actorRole: actor.staffRole ? `${actor.role} (${actor.staffRole})` : actor.role,
+      action: isReassign ? 'REASSIGN_DELIVERY_PARTNER' : `TRANSITION_ORDER_${nextStatus}`,
       resource: 'ORDER',
       resourceId: order.id,
-      oldValue: { status: currentStatus },
-      newValue: { status: nextStatus, ...metadata },
+      oldValue: { status: currentStatus, assignedDeliveryPartnerId: order.assignedDeliveryPartnerId },
+      newValue: { status: nextStatus, orderNumber: order.orderNumber, customerName: order.customerName, ...metadata },
       requestId
     });
 

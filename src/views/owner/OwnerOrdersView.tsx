@@ -4,6 +4,8 @@ import { apiService } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
 import { DeliveryBatchingModal } from './DeliveryBatchingModal';
 import { ReadyOrderModal } from '../../components/ReadyOrderModal';
+import { PartnerAssignDropdown } from '../../components/PartnerAssignDropdown';
+import { useNotification } from '../../context/NotificationContext';
 import {
   Check,
   X,
@@ -19,12 +21,23 @@ import {
   Banknote
 } from 'lucide-react';
 
-export const OwnerOrdersView: React.FC = () => {
+interface OwnerOrdersViewProps {
+  initialStatusFilter?: string;
+}
+
+export const OwnerOrdersView: React.FC<OwnerOrdersViewProps> = ({ initialStatusFilter = 'ALL' }) => {
   const { currentUser } = useAuth();
   const [orders, setOrders] = useState<Order[]>([]);
   const [deliveryPartners, setDeliveryPartners] = useState<User[]>([]);
-  const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [statusFilter, setStatusFilter] = useState<string>(initialStatusFilter);
   const [searchQuery, setSearchQuery] = useState('');
+
+  // initialStatusFilter prop sync
+  useEffect(() => {
+    if (initialStatusFilter) {
+      setStatusFilter(initialStatusFilter);
+    }
+  }, [initialStatusFilter]);
   const [isLoading, setIsLoading] = useState(true);
 
   // Reject Modal State
@@ -36,6 +49,8 @@ export const OwnerOrdersView: React.FC = () => {
   const [showBatchModal, setShowBatchModal] = useState(false);
   // Ready Modal State
   const [readyOrderId, setReadyOrderId] = useState<string | null>(null);
+  const { addNotification } = useNotification();
+  const [assigningOrderId, setAssigningOrderId] = useState<string | null>(null);
 
   const loadData = async () => {
     try {
@@ -85,7 +100,7 @@ export const OwnerOrdersView: React.FC = () => {
     if (['ASSIGNED', 'PICKED_UP', 'OUT_FOR_DELIVERY', 'DELIVERED'].includes(ord.status)) {
       const defaultPartner = deliveryPartners[0];
       return {
-        name: defaultPartner?.name || 'Arun Kumar (Rider)',
+        name: defaultPartner?.name || 'Delivery Partner',
         phone: defaultPartner?.phone || '+91 91234 56789',
         vehicle: defaultPartner?.vehicleNumber || 'Bike'
       };
@@ -142,11 +157,34 @@ export const OwnerOrdersView: React.FC = () => {
 
   const handleSingleAssign = async (orderId: string, partnerId: string) => {
     if (!partnerId) return;
+    setAssigningOrderId(orderId);
     try {
-      await apiService.assignDelivery(orderId, partnerId, currentUser?.id);
+      if (partnerId === '__UNASSIGN__') {
+        await apiService.markReady(orderId, currentUser?.id);
+        addNotification({
+          title: 'Order Returned to Ready',
+          message: 'Order unassigned and returned to ready queue.',
+          type: 'INFO'
+        });
+      } else {
+        const partner = deliveryPartners.find((p) => p.id === partnerId);
+        await apiService.assignDelivery(orderId, partnerId, currentUser?.id);
+        addNotification({
+          title: 'Delivery Partner Assigned',
+          message: `Assigned to ${partner?.name || 'delivery partner'}.`,
+          type: 'SUCCESS'
+        });
+      }
       await loadData();
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      addNotification({
+        title: 'Assignment Failed',
+        message: err.message || 'Failed to assign delivery partner.',
+        type: 'SYSTEM'
+      });
+    } finally {
+      setAssigningOrderId(null);
     }
   };
 
@@ -237,8 +275,20 @@ export const OwnerOrdersView: React.FC = () => {
       {isLoading ? (
         <div className="py-8 text-center text-stone-400 text-xs">Loading orders...</div>
       ) : filteredOrders.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-stone-200 p-8 text-center my-4">
-          <p className="text-xs text-stone-500 font-medium">No orders matching this filter.</p>
+        <div className="bg-white rounded-2xl border border-stone-200 p-8 text-center my-4 space-y-2.5">
+          <p className="text-xs text-stone-600 font-medium">
+            {statusFilter === 'ALL'
+              ? 'No orders placed yet. Live orders will populate here automatically.'
+              : `No orders in "${statusFilter.replace(/_/g, ' ')}" status right now.`}
+          </p>
+          {statusFilter !== 'ALL' && (
+            <button
+              onClick={() => setStatusFilter('ALL')}
+              className="px-3.5 py-1.5 rounded-xl bg-stone-100 hover:bg-stone-200 text-stone-800 text-xs font-bold transition-all cursor-pointer inline-flex items-center gap-1 shadow-3xs"
+            >
+              View All Orders
+            </button>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -417,48 +467,35 @@ export const OwnerOrdersView: React.FC = () => {
                           No delivery partner
                         </span>
                       ) : (
-                        <select
-                          onChange={(e) => handleSingleAssign(ord.id, e.target.value)}
-                          defaultValue=""
-                          className="p-1.5 border border-blue-300 rounded-xl text-xs font-bold bg-blue-50/50 text-blue-950 hover:bg-blue-50 cursor-pointer"
-                        >
-                          <option value="" disabled>
-                            🛵 Assign Driver...
-                          </option>
-                          {deliveryPartners.map((p) => (
-                            <option key={p.id} value={p.id}>
-                              {p.name} ({p.vehicleType || 'Bike'})
-                            </option>
-                          ))}
-                        </select>
+                        <PartnerAssignDropdown
+                          orderId={ord.id}
+                          deliveryPartners={deliveryPartners}
+                          isAssigning={assigningOrderId === ord.id}
+                          onSelect={handleSingleAssign}
+                          variant="assign"
+                        />
                       )}
                     </div>
                   )}
 
                   {ord.status === 'ASSIGNED' && (() => {
                     const partner = getPartnerInfo(ord);
+                    const isAssigning = assigningOrderId === ord.id;
                     return (
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-xs text-blue-900 font-bold bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-xl inline-flex items-center gap-1">
+                        <span className="text-xs text-blue-900 font-bold bg-blue-50 border border-blue-200 px-2.5 py-1 rounded-xl inline-flex items-center gap-1 shadow-3xs">
                           <Bike className="w-3.5 h-3.5 text-blue-700" />
-                          <span>Assigned to <strong className="font-extrabold text-blue-950">{partner?.name || 'Arun Kumar'}</strong></span>
+                          <span>Assigned to <strong className="font-extrabold text-blue-950">{partner?.name || 'Delivery Partner'}</strong></span>
                         </span>
                         {deliveryPartners.length > 0 && (
-                          <select
-                            onChange={(e) => handleSingleAssign(ord.id, e.target.value)}
-                            value=""
-                            title="Re-assign to another driver"
-                            className="p-1 border border-stone-200 rounded-lg text-[11px] font-semibold bg-white text-stone-700 hover:border-stone-400 cursor-pointer"
-                          >
-                            <option value="" disabled>
-                              Reassign...
-                            </option>
-                            {deliveryPartners.map((p) => (
-                              <option key={p.id} value={p.id}>
-                                {p.name} {p.id === ord.assignedDeliveryPartnerId ? '(Current)' : ''}
-                              </option>
-                            ))}
-                          </select>
+                          <PartnerAssignDropdown
+                            orderId={ord.id}
+                            currentPartnerId={ord.assignedDeliveryPartnerId}
+                            deliveryPartners={deliveryPartners}
+                            isAssigning={isAssigning}
+                            onSelect={handleSingleAssign}
+                            variant="reassign"
+                          />
                         )}
                       </div>
                     );

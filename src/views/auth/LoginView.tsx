@@ -244,7 +244,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="e.g. owner@hunterskitchen.com"
+                  placeholder="e.g. hunterkitchen777@gmail.com"
                   autoComplete="email"
                   required
                   className="block w-full pl-9 pr-3 py-2 text-sm border border-stone-300 rounded-xl bg-white text-stone-900 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-red-700 focus:border-red-700 transition-colors"
@@ -281,14 +281,15 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                   placeholder="••••••••"
                   autoComplete="current-password"
                   required
-                  className="block w-full pl-9 pr-10 py-2 text-sm border border-stone-300 rounded-xl bg-white text-stone-900 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-red-700 focus:border-red-700 transition-colors"
+                  className="block w-full pl-9 pr-10 py-2 text-sm border border-stone-300 rounded-xl bg-white text-stone-900 placeholder-stone-400 focus:outline-none focus:ring-2 focus:ring-red-700 focus:border-red-700 transition-colors [&::-ms-reveal]:hidden [&::-ms-clear]:hidden"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-stone-400 hover:text-stone-600"
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-stone-400 hover:text-stone-600 cursor-pointer"
+                  title={showPassword ? "Hide password" : "Show password"}
                 >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {showPassword ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                 </button>
               </div>
             </div>
@@ -416,7 +417,7 @@ export const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess }) => {
                     value={forgotEmail}
                     onChange={(e) => setForgotEmail(e.target.value)}
                     required
-                    placeholder="e.g. owner@hunterskitchen.com"
+                    placeholder="e.g. hunterkitchen777@gmail.com"
                     className="block w-full px-3 py-2 text-sm border border-stone-300 rounded-xl focus:ring-2 focus:ring-red-700"
                   />
                 </div>

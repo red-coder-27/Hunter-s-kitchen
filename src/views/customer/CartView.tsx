@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useCart } from '../../context/CartContext';
 import { useAuth } from '../../context/AuthContext';
-import { Trash2, Plus, Minus, ArrowRight, MapPin, ShoppingBag, Truck, Info, X, ShieldCheck, Utensils, ChevronRight } from 'lucide-react';
+import { Trash2, Plus, Minus, ArrowRight, MapPin, ShoppingBag, Info, X, ShieldCheck, Utensils, ChevronRight } from 'lucide-react';
 
 interface CartViewProps {
   onProceedToCheckout: () => void;
@@ -26,8 +26,6 @@ export const CartView: React.FC<CartViewProps> = ({ onProceedToCheckout, onBrows
   } = useCart();
 
   const { settings } = useAuth();
-  const freeThreshold = settings?.freeDeliveryThreshold || 500;
-  const neededForFree = Math.max(0, freeThreshold - subtotal);
 
   const cgst = (subtotal * 0.025).toFixed(2);
   const sgst = (subtotal * 0.025).toFixed(2);
@@ -54,28 +52,6 @@ export const CartView: React.FC<CartViewProps> = ({ onProceedToCheckout, onBrows
 
   return (
     <div className="pb-28 md:pb-16 max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-5">
-      {/* Free Delivery Banner */}
-      <div className="bg-amber-50 border border-amber-200/80 rounded-2xl p-3.5 flex items-center gap-3">
-        <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center shrink-0">
-          <Truck className="w-5 h-5" />
-        </div>
-        <div className="flex-1 min-w-0">
-          {neededForFree > 0 ? (
-            <>
-              <p className="text-xs font-bold text-amber-950">Add ₹{neededForFree} more for FREE Delivery!</p>
-              <div className="w-full bg-amber-200/80 h-1.5 rounded-full mt-1.5 overflow-hidden">
-                <div
-                  className="bg-amber-600 h-full rounded-full transition-all duration-300"
-                  style={{ width: `${Math.min(100, (subtotal / freeThreshold) * 100)}%` }}
-                ></div>
-              </div>
-            </>
-          ) : (
-            <p className="text-xs font-bold text-emerald-800">🎉 Congratulations! You unlocked FREE Delivery!</p>
-          )}
-        </div>
-      </div>
-
       {/* Cart Items List */}
       <div className="bg-white rounded-2xl border border-stone-200/80 p-4 shadow-2xs space-y-3">
         <h3 className="font-extrabold text-sm text-stone-900 pb-2 border-b border-stone-100">

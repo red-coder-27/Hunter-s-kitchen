@@ -1,6 +1,6 @@
-import fs from 'fs';
-import path from 'path';
 import bcrypt from 'bcryptjs';
+import { PoolClient } from 'pg';
+import { postgresDb } from './db/postgres';
 import {
   User,
   UserRole,
@@ -9,15 +9,16 @@ import {
   MenuItem,
   Category,
   Order,
+  OrderStatus,
+  OrderItemSnapshot,
+  OrderEvent,
   DeliveryBatch,
   Review,
   AppNotification,
   RestaurantSettings,
   AnalyticsSummary
 } from '../types';
-
-const DATA_DIR = path.join(process.cwd(), 'data');
-const DB_FILE = path.join(DATA_DIR, 'database.json');
+import { normalizeEmail } from './utils/sanitizer';
 
 export interface UserAuthCredentials {
   userId: string;
@@ -29,19 +30,6 @@ export interface UserAuthCredentials {
   inviteExpires?: number;
   failedLoginAttempts?: number;
   lastFailedLogin?: number;
-}
-
-export interface DatabaseSchema {
-  settings: RestaurantSettings;
-  users: User[];
-  categories: Category[];
-  menuItems: MenuItem[];
-  orders: Order[];
-  deliveryBatches: DeliveryBatch[];
-  reviews: Review[];
-  notifications: AppNotification[];
-  addresses: Record<string, Address[]>; // customerId -> Address[]
-  authCredentials?: Record<string, UserAuthCredentials>; // userId -> UserAuthCredentials
 }
 
 export function computeUserPermissions(role: UserRole, staffRole?: StaffSubRole): string[] {
@@ -70,41 +58,31 @@ export function computeUserPermissions(role: UserRole, staffRole?: StaffSubRole)
     ];
   }
   if (role === 'STAFF') {
-    switch (staffRole) {
-      case 'KITCHEN_MANAGER':
-      case 'GENERAL_MANAGER':
-        return [
-          'orders.read',
-          'orders.update',
-          'orders.cancel',
-          'menu.read',
-          'menu.availability',
-          'batches.manage'
-        ];
-      case 'HEAD_CHEF':
-      case 'KITCHEN_CHEF':
-        return [
-          'orders.read',
-          'orders.update',
-          'menu.read',
-          'menu.availability'
-        ];
-      case 'LINE_COOK':
-        return [
-          'orders.read',
-          'orders.update'
-        ];
-      case 'FRONT_DESK':
-      case 'ORDER_BILLER':
-      case 'STORE_DISPATCHER':
-      default:
-        return [
-          'orders.read',
-          'orders.create',
-          'orders.update',
-          'menu.read'
-        ];
+    if (staffRole === 'GENERAL_MANAGER') {
+      return [
+        'orders.read',
+        'orders.create',
+        'orders.update',
+        'orders.cancel',
+        'orders.assign',
+        'orders.deliver',
+        'menu.read',
+        'menu.create',
+        'menu.update',
+        'menu.availability',
+        'batches.manage',
+        'analytics.read'
+      ];
     }
+    // Default Kitchen Staff (Order accepting, order rejecting, assigning delivery partners)
+    return [
+      'orders.read',
+      'orders.update',
+      'orders.cancel',
+      'orders.assign',
+      'menu.read',
+      'menu.availability'
+    ];
   }
   if (role === 'DELIVERY_PARTNER') {
     return [
@@ -121,1942 +99,1359 @@ export function computeUserPermissions(role: UserRole, staffRole?: StaffSubRole)
   ];
 }
 
-const INITIAL_SETTINGS: RestaurantSettings = {
-  restaurantName: "Hunter's Kitchen",
-  phone: "+91 98765 00000",
-  email: "contact@hunterskitchen.com",
-  address: "42 Richmond Road, Shanthi Nagar, Bengaluru",
-  isOpen: true,
-  temporaryPause: false,
-  openingTime: "11:00 AM",
-  closingTime: "11:00 PM",
-  deliveryRadiusKm: 10,
-  baseDeliveryFee: 35,
-  freeDeliveryThreshold: 500,
-  codEnabled: true,
-  onlinePaymentEnabled: true,
-  announcement: ""
-};
+// -----------------------------------------------------------------------------
+// Entity Transformation Helpers (Row -> TypeScript Types)
+// -----------------------------------------------------------------------------
 
-const INITIAL_USERS: User[] = [
-  {
-    id: 'usr_owner_1',
-    name: 'Chef Senthil (Owner)',
-    email: 'owner@hunterskitchen.com',
-    phone: '+91 98765 43210',
-    role: 'OWNER',
-    status: 'ACTIVE',
-    joinedAt: '2025-01-01T00:00:00Z',
-    restaurantId: 'rest_hunter_01'
-  },
-  {
-    id: 'usr_staff_1',
-    name: 'Manoj Kumar (Kitchen Manager)',
-    email: 'staff1@hunterskitchen.com',
-    phone: '+91 98765 11111',
-    role: 'STAFF',
-    staffRole: 'KITCHEN_MANAGER',
-    status: 'ACTIVE',
-    joinedAt: '2025-02-10T00:00:00Z',
-    restaurantId: 'rest_hunter_01'
-  },
-  {
-    id: 'usr_staff_2',
-    name: 'Kavitha Raj (Front Desk)',
-    email: 'staff2@hunterskitchen.com',
-    phone: '+91 98765 22222',
-    role: 'STAFF',
-    staffRole: 'FRONT_DESK',
-    status: 'ACTIVE',
-    joinedAt: '2025-03-01T00:00:00Z',
-    restaurantId: 'rest_hunter_01'
-  },
-  {
-    id: 'usr_staff_3',
-    name: 'Saravanan (Head Chef)',
-    email: 'chef@hunterskitchen.com',
-    phone: '+91 98765 33331',
-    role: 'STAFF',
-    staffRole: 'HEAD_CHEF',
-    status: 'ACTIVE',
-    joinedAt: '2025-03-05T00:00:00Z',
-    restaurantId: 'rest_hunter_01'
-  },
-  {
-    id: 'usr_staff_4',
-    name: 'Dinesh (Line Cook)',
-    email: 'cook@hunterskitchen.com',
-    phone: '+91 98765 33332',
-    role: 'STAFF',
-    staffRole: 'LINE_COOK',
-    status: 'ACTIVE',
-    joinedAt: '2025-03-12T00:00:00Z',
-    restaurantId: 'rest_hunter_01'
-  },
-  {
-    id: 'usr_staff_invited',
-    name: 'Ramesh Chef (Invited)',
-    email: 'invited@hunterskitchen.com',
-    phone: '+91 98765 33333',
-    role: 'STAFF',
-    staffRole: 'LINE_COOK',
-    status: 'INVITED',
-    joinedAt: '2025-04-15T00:00:00Z',
-    restaurantId: 'rest_hunter_01'
-  },
-  {
-    id: 'usr_delivery_1',
-    name: 'Arun Kumar',
-    email: 'delivery1@hunterskitchen.com',
-    phone: '+91 91234 56789',
-    role: 'DELIVERY_PARTNER',
-    status: 'ACTIVE',
-    partnerStatus: 'ONLINE',
-    vehicleNumber: 'TN-37-AB-1234',
-    vehicleType: 'Bike',
-    currentRating: 4.8,
-    totalDeliveries: 142,
-    joinedAt: '2025-01-15T00:00:00Z',
-    restaurantId: 'rest_hunter_01'
-  },
-  {
-    id: 'usr_delivery_2',
-    name: 'Karthik Raja',
-    email: 'delivery2@hunterskitchen.com',
-    phone: '+91 91234 56790',
-    role: 'DELIVERY_PARTNER',
-    status: 'ACTIVE',
-    partnerStatus: 'ONLINE',
-    vehicleNumber: 'TN-37-CD-5678',
-    vehicleType: 'Scooter',
-    currentRating: 4.9,
-    totalDeliveries: 98,
-    joinedAt: '2025-02-01T00:00:00Z',
-    restaurantId: 'rest_hunter_01'
-  },
-  {
-    id: 'usr_delivery_3',
-    name: 'Vijay Anand',
-    email: 'delivery3@hunterskitchen.com',
-    phone: '+91 91234 56791',
-    role: 'DELIVERY_PARTNER',
-    status: 'ACTIVE',
-    partnerStatus: 'ONLINE',
-    vehicleNumber: 'TN-37-EF-9012',
-    vehicleType: 'Bike',
-    currentRating: 4.7,
-    totalDeliveries: 210,
-    joinedAt: '2025-01-20T00:00:00Z',
-    restaurantId: 'rest_hunter_01'
-  },
-  {
-    id: 'usr_delivery_4',
-    name: 'Suriya Prakash',
-    email: 'delivery4@hunterskitchen.com',
-    phone: '+91 91234 56792',
-    role: 'DELIVERY_PARTNER',
-    status: 'INACTIVE',
-    partnerStatus: 'OFFLINE',
-    vehicleNumber: 'TN-37-GH-3456',
-    vehicleType: 'Bike',
-    currentRating: 4.6,
-    totalDeliveries: 45,
-    joinedAt: '2025-03-10T00:00:00Z',
-    restaurantId: 'rest_hunter_01'
-  },
-  {
-    id: 'usr_customer_1',
-    name: 'Priya Sundaram',
-    email: 'customer1@hunterskitchen.com',
-    phone: '+91 99887 76655',
-    role: 'CUSTOMER',
-    status: 'ACTIVE',
-    joinedAt: '2025-04-01T00:00:00Z',
-    restaurantId: 'rest_hunter_01'
-  },
-  {
-    id: 'usr_customer_2',
-    name: 'Rahul Sharma',
-    email: 'customer2@hunterskitchen.com',
-    phone: '+91 99887 76644',
-    role: 'CUSTOMER',
-    status: 'ACTIVE',
-    joinedAt: '2025-04-12T00:00:00Z',
-    restaurantId: 'rest_hunter_01'
-  },
-  {
-    id: 'usr_suspended_1',
-    name: 'Suspended User',
-    email: 'suspended@hunterskitchen.com',
-    phone: '+91 99887 00000',
-    role: 'CUSTOMER',
-    status: 'SUSPENDED',
-    joinedAt: '2025-04-10T00:00:00Z',
-    restaurantId: 'rest_hunter_01'
-  }
-];
+function rowToSettings(row: any): RestaurantSettings {
+  return {
+    restaurantName: row.restaurant_name,
+    phone: row.phone,
+    email: row.email,
+    address: row.address,
+    isOpen: row.is_open,
+    temporaryPause: row.temporary_pause,
+    pauseReason: row.pause_reason || '',
+    openingTime: row.opening_time,
+    closingTime: row.closing_time,
+    deliveryRadiusKm: Number(row.delivery_radius_km),
+    baseDeliveryFee: Number(row.base_delivery_fee),
+    freeDeliveryThreshold: Number(row.free_delivery_threshold),
+    codEnabled: row.cod_enabled,
+    onlinePaymentEnabled: row.online_payment_enabled,
+    announcement: row.announcement || ''
+  };
+}
 
-const INITIAL_CATEGORIES: Category[] = [
-  { id: 'cat_biriyani', name: 'Biriyani Specials', description: 'Aromatic Seeraga Samba and Basmati rice delicacies cooked with authentic spices', icon: '🍲' },
-  { id: 'cat_starters', name: 'Starters & Tandoori', description: 'Crispy appetizers, kebabs, and juicy charcoal grilled delights', icon: '🍗' },
-  { id: 'cat_noodles', name: 'Noodles', description: 'Delicious stir-fried street-style and wok-tossed noodles', icon: '🍜' },
-  { id: 'cat_rice', name: 'Rice Dishes', description: 'Fragrant basmati fried rice and traditional rice items', icon: '🍚' },
-  { id: 'cat_parotta', name: 'Parotta & Breads', description: 'Flaky South Indian parottas, naans, and stuffed flatbreads', icon: '🫓' },
-  { id: 'cat_dosa', name: 'Dosa & Tiffin', description: 'Golden crispy dosas, fluffy idlis, and traditional tiffin items', icon: '🥞' },
-  { id: 'cat_gravies', name: 'Gravies & Meals', description: 'Rich Chettinad, Mughlai, and traditional South Indian gravies', icon: '🥘' },
-  { id: 'cat_beverages', name: 'Beverages & Juices', description: 'Fresh fruit juices, chilled lassis, and herbal coolers', icon: '🥤' },
-  { id: 'cat_desserts', name: 'Desserts', description: 'Sweet traditional treats and ice cream delights', icon: '🍨' }
-];
+function rowToUser(row: any): User {
+  const permissions = Array.isArray(row.permissions)
+    ? row.permissions
+    : typeof row.permissions === 'string'
+    ? JSON.parse(row.permissions)
+    : [];
 
-const INITIAL_MENU_ITEMS: MenuItem[] = [
-  {
-    id: 'item_101',
-    name: "Hunter's Special Chicken Biriyani",
-    description: 'Slow-dum cooked tender chicken marinated in authentic secret house spices with Seeraga Samba rice',
-    categoryId: 'cat_biriyani',
-    categoryName: 'Biriyani Specials',
-    price: 240,
-    discountPrice: 220,
-    imageUrl: 'https://images.unsplash.com/photo-1563379091339-03b21ab4a4f8?w=600&auto=format&fit=crop&q=80',
-    isVeg: false,
-    isAvailable: true,
-    prepTimeMinutes: 20,
-    isBestseller: true,
-    isPopular: true,
-    rating: 4.9,
-    ratingCount: 382,
-    customizations: [
-      {
-        id: 'cust_spice_1',
-        name: 'Spice Level',
-        options: [
-          { label: 'Medium Spice', price: 0 },
-          { label: 'Authentic Spicy', price: 0 },
-          { label: 'Extra Spicy', price: 0 }
-        ]
-      }
-    ],
-    addons: [
-      { id: 'add_egg', name: 'Boiled Egg (1 Pc)', price: 15 },
-      { id: 'add_gravy', name: 'Extra Salna / Gravy', price: 20 },
-      { id: 'add_raitha', name: 'Extra Onion Raitha', price: 15 }
-    ],
-    ingredients: ['Seeraga Samba Rice', 'Tender Chicken', 'Ghee', 'Biriyani Spices', 'Mint', 'Coriander']
-  },
-  {
-    id: 'item_102',
-    name: 'Mutton Seeraga Samba Biriyani',
-    description: 'Rich and aromatic mutton biriyani cooked with tender grass-fed mutton pieces and ghee',
-    categoryId: 'cat_biriyani',
-    categoryName: 'Biriyani Specials',
-    price: 340,
-    discountPrice: 320,
-    imageUrl: 'https://images.unsplash.com/photo-1626777552726-4a6b54c97e46?w=600&auto=format&fit=crop&q=80',
-    isVeg: false,
-    isAvailable: true,
-    prepTimeMinutes: 25,
-    isBestseller: true,
-    rating: 4.9,
-    ratingCount: 295,
-    customizations: [
-      {
-        id: 'cust_spice_2',
-        name: 'Spice Level',
-        options: [
-          { label: 'Medium Spice', price: 0 },
-          { label: 'Spicy', price: 0 }
-        ]
-      }
-    ],
-    addons: [
-      { id: 'add_egg_2', name: 'Boiled Egg', price: 15 },
-      { id: 'add_bone_marrow', name: 'Bone Marrow Extra', price: 60 }
-    ]
-  },
-  {
-    id: 'item_103',
-    name: 'Mushroom Dum Biriyani',
-    description: 'Fragrant basmati rice dum cooked with fresh button mushrooms, caramelized onions, and whole spices',
-    categoryId: 'cat_biriyani',
-    categoryName: 'Biriyani Specials',
-    price: 190,
-    imageUrl: 'https://images.unsplash.com/photo-1642821373181-696a54913e93?w=600&auto=format&fit=crop&q=80',
-    isVeg: true,
-    isAvailable: true,
-    prepTimeMinutes: 18,
-    isPopular: true,
-    rating: 4.7,
-    ratingCount: 142
-  },
-  {
-    id: 'item_104',
-    name: 'Chicken 65 Boneless',
-    description: 'Crispy deep-fried chicken cubes tossed with curry leaves, green chillies, and homemade masala',
-    categoryId: 'cat_starters',
-    categoryName: 'Starters & Tandoori',
-    price: 220,
-    imageUrl: 'https://images.unsplash.com/photo-1610057099443-fde8c4d50f91?w=600&auto=format&fit=crop&q=80',
-    isVeg: false,
-    isAvailable: true,
-    prepTimeMinutes: 15,
-    isBestseller: true,
-    isPopular: true,
-    rating: 4.8,
-    ratingCount: 410
-  },
-  {
-    id: 'item_105',
-    name: 'Paneer Tikka Charcoal Grill',
-    description: 'Fresh malai paneer cubes marinated in yogurt and tandoori spices, charcoal roasted to perfection',
-    categoryId: 'cat_starters',
-    categoryName: 'Starters & Tandoori',
-    price: 190,
-    imageUrl: 'https://images.unsplash.com/photo-1567188040759-fb8a883dc6d8?w=600&auto=format&fit=crop&q=80',
-    isVeg: true,
-    isAvailable: true,
-    prepTimeMinutes: 15,
-    rating: 4.6,
-    ratingCount: 180
-  },
-  {
-    id: 'item_106',
-    name: 'Madurai Bun Parotta (2 Pcs)',
-    description: 'Soft and crispy bun parotta baked layer by layer using traditional ghee recipe',
-    categoryId: 'cat_parotta',
-    categoryName: 'Parotta & Breads',
-    price: 70,
-    imageUrl: 'https://images.unsplash.com/photo-1626074353765-517a681e40be?w=600&auto=format&fit=crop&q=80',
-    isVeg: true,
-    isAvailable: true,
-    prepTimeMinutes: 10,
-    isBestseller: true,
-    rating: 4.9,
-    ratingCount: 520
-  },
-  {
-    id: 'item_107',
-    name: 'Ceylon Chicken Kothu Parotta',
-    description: 'Shredded parotta chopped on hot griddle with chicken, eggs, onions, and spicy gravy',
-    categoryId: 'cat_parotta',
-    categoryName: 'Parotta & Breads',
-    price: 160,
-    imageUrl: 'https://images.unsplash.com/photo-1601050690597-df0568f70950?w=600&auto=format&fit=crop&q=80',
-    isVeg: false,
-    isAvailable: true,
-    prepTimeMinutes: 15,
-    isPopular: true,
-    rating: 4.8,
-    ratingCount: 310
-  },
-  {
-    id: 'item_108',
-    name: 'Ghee Roast Butter Dosa',
-    description: 'Golden crispy thin dosa roasted generously with pure Cow Ghee, served with 3 chutneys & sambar',
-    categoryId: 'cat_dosa',
-    categoryName: 'Dosa & Tiffin',
-    price: 100,
-    imageUrl: 'https://images.unsplash.com/photo-1668236543090-82eba5ee5976?w=600&auto=format&fit=crop&q=80',
-    isVeg: true,
-    isAvailable: true,
-    prepTimeMinutes: 12,
-    isPopular: true,
-    rating: 4.7,
-    ratingCount: 220
-  },
-  {
-    id: 'item_109',
-    name: 'Chettinad Chicken Pepper Gravy',
-    description: 'Traditional Chettinad style thick chicken curry infused with fresh roasted black pepper and coconut',
-    categoryId: 'cat_gravies',
-    categoryName: 'Gravies & Meals',
-    price: 260,
-    imageUrl: 'https://images.unsplash.com/photo-1588166524941-3bf61a9c41db?w=600&auto=format&fit=crop&q=80',
-    isVeg: false,
-    isAvailable: true,
-    prepTimeMinutes: 18,
-    rating: 4.8,
-    ratingCount: 260
-  },
-  {
-    id: 'item_110',
-    name: 'Elaneer Payasam (Tender Coconut)',
-    description: 'Signature chilled dessert made with fresh tender coconut water, coconut pulp, milk, and cardamom',
-    categoryId: 'cat_desserts',
-    categoryName: 'Desserts',
-    price: 120,
-    imageUrl: 'https://images.unsplash.com/photo-1551024709-8f23befc6f87?w=600&auto=format&fit=crop&q=80',
-    isVeg: true,
-    isAvailable: true,
-    prepTimeMinutes: 5,
-    isBestseller: true,
-    rating: 4.9,
-    ratingCount: 340
-  },
-  {
-    id: 'item_111',
-    name: 'Fresh Mint Lime Soda',
-    description: 'Refreshing sparkling cooler with handpicked mint leaves, fresh lime juice, and rock salt',
-    categoryId: 'cat_beverages',
-    categoryName: 'Beverages & Juices',
-    price: 60,
-    imageUrl: 'https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?w=600&auto=format&fit=crop&q=80',
-    isVeg: true,
-    isAvailable: true,
-    prepTimeMinutes: 5,
-    rating: 4.6,
-    ratingCount: 150
-  }
-];
+  return {
+    id: row.id,
+    name: row.name,
+    email: row.email,
+    phone: row.phone,
+    role: row.role,
+    staffRole: row.staff_role || undefined,
+    avatar: row.avatar || undefined,
+    status: row.status,
+    partnerStatus: row.partner_status || (row.role === 'DELIVERY_PARTNER' && row.status === 'ACTIVE' ? 'ONLINE' : undefined),
+    vehicleNumber: row.vehicle_number || undefined,
+    vehicleType: row.vehicle_type || undefined,
+    currentRating: row.current_rating !== null ? Number(row.current_rating) : undefined,
+    totalDeliveries: row.total_deliveries !== null ? Number(row.total_deliveries) : undefined,
+    joinedAt: row.joined_at ? new Date(row.joined_at).toISOString() : new Date().toISOString(),
+    permissions: permissions.length > 0 ? permissions : computeUserPermissions(row.role, row.staff_role),
+    restaurantId: row.restaurant_id || 'rest_hunter_01',
+    googleId: row.google_id || undefined,
+    emailVerified: row.email_verified === true
+  };
+}
 
-const INITIAL_ADDRESSES: Record<string, Address[]> = {};
+function rowToCategory(row: any): Category {
+  return {
+    id: row.id,
+    name: row.name,
+    description: row.description || '',
+    icon: row.icon || '',
+    itemCount: Number(row.item_count || 0)
+  };
+}
 
-const INITIAL_ORDERS: Order[] = [
-  {
-    id: 'ord_1001',
-    orderNumber: 'HK-20260812-000101',
-    customerId: 'usr_customer_1',
-    customerName: 'Priya Sundaram',
-    customerPhone: '+91 99887 76655',
-    deliveryAddress: {
-      id: 'addr_1',
-      type: 'HOME',
-      name: 'Priya Sundaram',
-      phone: '+91 99887 76655',
-      doorNo: '42-B',
-      street: 'Greenways Road',
-      area: 'Race Course',
-      city: 'Coimbatore',
-      pincode: '641018',
-      landmark: 'Opp. Park Gate 2'
-    },
-    items: [
-      {
-        menuItemId: 'item_101',
-        name: "Hunter's Special Chicken Biriyani",
-        unitPrice: 220,
-        quantity: 2,
-        isVeg: false,
-        customizations: [{ optionName: 'Spice Level', selectedLabel: 'Authentic Spicy', price: 0 }],
-        addons: [{ addonId: 'add_egg', name: 'Boiled Egg (1 Pc)', price: 15 }],
-        specialInstructions: 'Extra spicy please!',
-        totalPrice: 470
-      },
-      {
-        menuItemId: 'item_104',
-        name: 'Chicken 65 Boneless',
-        unitPrice: 220,
-        quantity: 1,
-        isVeg: false,
-        customizations: [],
-        addons: [],
-        totalPrice: 220
-      }
-    ],
-    orderNotes: 'Please pack extra raitha and include spoons.',
-    subtotal: 690,
-    deliveryFee: 0, // > 500
-    tax: 34.5,
-    discount: 0,
-    grandTotal: 724.5,
-    paymentMethod: 'ONLINE',
-    paymentStatus: 'VERIFIED',
-    paymentTransactionId: 'TXN_987123984712',
-    status: 'PREPARING',
-    createdAt: new Date(Date.now() - 1000 * 60 * 18).toISOString(), // 18 mins ago
-    acceptedAt: new Date(Date.now() - 1000 * 60 * 15).toISOString(),
-    preparingAt: new Date(Date.now() - 1000 * 60 * 12).toISOString(),
-    events: [
-      {
-        id: 'evt_1',
-        orderId: 'ord_1001',
-        status: 'PLACED',
-        title: 'Order Placed',
-        description: 'Order received and payment verified via Online Gateway',
-        timestamp: new Date(Date.now() - 1000 * 60 * 18).toISOString(),
-        changedBy: 'usr_customer_1',
-        changedByRole: 'CUSTOMER'
-      },
-      {
-        id: 'evt_2',
-        orderId: 'ord_1001',
-        status: 'ACCEPTED',
-        title: 'Order Accepted',
-        description: 'Accepted by Kitchen Staff Manoj Kumar',
-        timestamp: new Date(Date.now() - 1000 * 60 * 15).toISOString(),
-        changedBy: 'usr_staff_1',
-        changedByRole: 'STAFF'
-      },
-      {
-        id: 'evt_3',
-        orderId: 'ord_1001',
-        status: 'PREPARING',
-        title: 'Food Preparing',
-        description: 'Chef is preparing your meals in the kitchen',
-        timestamp: new Date(Date.now() - 1000 * 60 * 12).toISOString(),
-        changedBy: 'usr_staff_1',
-        changedByRole: 'STAFF'
-      }
-    ]
-  },
-  {
-    id: 'ord_1002',
-    orderNumber: 'HK-20260812-000102',
-    customerId: 'usr_customer_2',
-    customerName: 'Rahul Sharma',
-    customerPhone: '+91 99887 76644',
-    deliveryAddress: {
-      id: 'addr_rahul',
-      type: 'HOME',
-      name: 'Rahul Sharma',
-      phone: '+91 99887 76644',
-      doorNo: '108',
-      street: 'Trichy Road',
-      area: 'Ramanathapuram',
-      city: 'Coimbatore',
-      pincode: '641045'
-    },
-    items: [
-      {
-        menuItemId: 'item_102',
-        name: 'Mutton Seeraga Samba Biriyani',
-        unitPrice: 320,
-        quantity: 1,
-        isVeg: false,
-        customizations: [],
-        addons: [],
-        totalPrice: 320
-      },
-      {
-        menuItemId: 'item_110',
-        name: 'Elaneer Payasam (Tender Coconut)',
-        unitPrice: 120,
-        quantity: 2,
-        isVeg: true,
-        customizations: [],
-        addons: [],
-        totalPrice: 240
-      }
-    ],
-    subtotal: 560,
-    deliveryFee: 0,
-    tax: 28,
-    discount: 0,
-    grandTotal: 588,
-    paymentMethod: 'COD',
-    paymentStatus: 'COD_PENDING',
-    status: 'READY',
-    createdAt: new Date(Date.now() - 1000 * 60 * 35).toISOString(),
-    acceptedAt: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
-    preparingAt: new Date(Date.now() - 1000 * 60 * 25).toISOString(),
-    readyAt: new Date(Date.now() - 1000 * 60 * 5).toISOString(),
-    events: [
-      {
-        id: 'evt_1002_1',
-        orderId: 'ord_1002',
-        status: 'PLACED',
-        title: 'Order Placed',
-        description: 'Order placed with Cash on Delivery option',
-        timestamp: new Date(Date.now() - 1000 * 60 * 35).toISOString(),
-        changedBy: 'usr_customer_2',
-        changedByRole: 'CUSTOMER'
-      },
-      {
-        id: 'evt_1002_2',
-        orderId: 'ord_1002',
-        status: 'ACCEPTED',
-        title: 'Order Accepted',
-        description: 'Order accepted by Owner Chef Senthil',
-        timestamp: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
-        changedBy: 'usr_owner_1',
-        changedByRole: 'OWNER'
-      },
-      {
-        id: 'evt_1002_3',
-        orderId: 'ord_1002',
-        status: 'PREPARING',
-        title: 'Food Preparing',
-        description: 'Kitchen actively preparing mutton biriyani',
-        timestamp: new Date(Date.now() - 1000 * 60 * 25).toISOString(),
-        changedBy: 'usr_staff_1',
-        changedByRole: 'STAFF'
-      },
-      {
-        id: 'evt_1002_4',
-        orderId: 'ord_1002',
-        status: 'READY',
-        title: 'Food Ready for Pickup',
-        description: 'Order packed & awaiting delivery partner assignment',
-        timestamp: new Date(Date.now() - 1000 * 60 * 5).toISOString(),
-        changedBy: 'usr_staff_1',
-        changedByRole: 'STAFF'
-      }
-    ]
-  }
-];
+function rowToMenuItem(row: any): MenuItem {
+  const parseJson = (val: any) => (typeof val === 'string' ? JSON.parse(val) : val || []);
+  return {
+    id: row.id,
+    name: row.name,
+    description: row.description || '',
+    categoryId: row.category_id,
+    categoryName: row.category_name,
+    price: Number(row.price),
+    discountPrice: row.discount_price !== null ? Number(row.discount_price) : undefined,
+    imageUrl: row.image_url || '',
+    isVeg: row.is_veg,
+    isAvailable: row.is_available,
+    prepTimeMinutes: Number(row.prep_time_minutes || 15),
+    isPopular: row.is_popular === true,
+    isBestseller: row.is_bestseller === true,
+    rating: Number(row.rating || 5.0),
+    ratingCount: Number(row.rating_count || 0),
+    customizations: parseJson(row.customizations),
+    addons: parseJson(row.addons),
+    ingredients: parseJson(row.ingredients)
+  };
+}
 
-const INITIAL_REVIEWS: Review[] = [
-  {
-    id: 'rev_1',
-    orderId: 'ord_hist_0',
-    orderNumber: 'HK-20260811-000095',
-    customerId: 'usr_customer_1',
-    customerName: 'Priya Sundaram',
-    foodRating: 5,
-    deliveryRating: 5,
-    overallRating: 5,
-    comment: "The Hunter's special biriyani was incredibly fragrant and rich! Delivery driver Arun arrived hot and fresh.",
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(),
-    itemRatings: [
-      {
-        menuItemId: 'item_101',
-        menuItemName: "Hunter's Special Chicken Biriyani",
-        rating: 5,
-        comment: 'Authentic seeraga samba rice and super tender chicken. Loved the spice level!'
-      },
-      {
-        menuItemId: 'item_104',
-        menuItemName: 'Chicken 65 Boneless',
-        rating: 5,
-        comment: 'Crispy and juicy boneless chicken pieces!'
-      }
-    ]
-  },
-  {
-    id: 'rev_2',
-    orderId: 'ord_hist_1',
-    orderNumber: 'HK-20260810-000088',
-    customerId: 'usr_customer_2',
-    customerName: 'Karthik Raja',
-    foodRating: 5,
-    deliveryRating: 4,
-    overallRating: 5,
-    comment: 'Best mutton biriyani in town! Soft meat that melts in mouth.',
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 48).toISOString(),
-    itemRatings: [
-      {
-        menuItemId: 'item_102',
-        menuItemName: 'Mutton Seeraga Samba Biriyani',
-        rating: 5,
-        comment: 'Pure ghee flavour and bone marrow was sublime!'
-      }
-    ]
-  },
-  {
-    id: 'rev_3',
-    orderId: 'ord_hist_2',
-    orderNumber: 'HK-20260809-000072',
-    customerId: 'usr_customer_3',
-    customerName: 'Ananya Ramesh',
-    foodRating: 4,
-    deliveryRating: 5,
-    overallRating: 4,
-    comment: 'Flaky bun parottas paired with chicken salna were divine.',
-    createdAt: new Date(Date.now() - 1000 * 60 * 60 * 72).toISOString(),
-    itemRatings: [
-      {
-        menuItemId: 'item_107',
-        menuItemName: 'Madurai Bun Parotta (2 Pcs)',
-        rating: 5,
-        comment: 'Super soft and flaky bun parotta, perfect salna combo!'
-      }
-    ]
-  }
-];
+function rowToAddress(row: any): Address {
+  return {
+    id: row.id,
+    type: row.type,
+    name: row.name,
+    phone: row.phone,
+    doorNo: row.door_no,
+    street: row.street,
+    area: row.area,
+    city: row.city,
+    pincode: row.pincode,
+    landmark: row.landmark || undefined,
+    instructions: row.instructions || undefined,
+    coordinates: row.coordinates || undefined,
+    isDefault: row.is_default === true
+  };
+}
 
-class Database {
-  private data: DatabaseSchema;
-  private defaultPasswordHash: string;
+function rowToOrder(row: any, items: OrderItemSnapshot[] = [], events: OrderEvent[] = []): Order {
+  const parseJson = (val: any) => (typeof val === 'string' ? JSON.parse(val) : val);
+  return {
+    id: row.id,
+    orderNumber: row.order_number,
+    customerId: row.customer_id,
+    customerName: row.customer_name,
+    customerPhone: row.customer_phone,
+    deliveryAddress: parseJson(row.delivery_address) || {},
+    items,
+    orderNotes: row.order_notes || undefined,
+    subtotal: Number(row.subtotal),
+    deliveryFee: Number(row.delivery_fee),
+    tax: Number(row.tax),
+    discount: Number(row.discount),
+    grandTotal: Number(row.grand_total),
+    paymentMethod: row.payment_method,
+    paymentStatus: row.payment_status,
+    paymentTransactionId: row.payment_transaction_id || undefined,
+    codCashTendered: row.cod_cash_tendered !== null ? Number(row.cod_cash_tendered) : undefined,
+    codChangeDue: row.cod_change_due !== null ? Number(row.cod_change_due) : undefined,
+    status: row.status,
+    rejectionReason: row.rejection_reason || undefined,
+    cancellationReason: row.cancellation_reason || undefined,
+    assignedStaffId: row.assigned_staff_id || undefined,
+    assignedStaffName: row.assigned_staff_name || undefined,
+    assignedDeliveryPartnerId: row.assigned_delivery_partner_id || undefined,
+    assignedDeliveryPartnerName: row.assigned_delivery_partner_name || undefined,
+    assignedDeliveryPartnerPhone: row.assigned_delivery_partner_phone || undefined,
+    assignedDeliveryPartnerVehicle: row.assigned_delivery_partner_vehicle || undefined,
+    batchId: row.batch_id || undefined,
+    checklist: parseJson(row.checklist) || undefined,
+    scheduledSlot: parseJson(row.scheduled_slot) || undefined,
+    hasBeenReviewed: row.has_been_reviewed === true,
+    version: Number(row.version || 1),
+    createdAt: row.created_at ? new Date(row.created_at).toISOString() : new Date().toISOString(),
+    acceptedAt: row.accepted_at ? new Date(row.accepted_at).toISOString() : undefined,
+    preparingAt: row.preparing_at ? new Date(row.preparing_at).toISOString() : undefined,
+    readyAt: row.ready_at ? new Date(row.ready_at).toISOString() : undefined,
+    pickedUpAt: row.picked_up_at ? new Date(row.picked_up_at).toISOString() : undefined,
+    deliveredAt: row.delivered_at ? new Date(row.delivered_at).toISOString() : undefined,
+    cancelledAt: row.cancelled_at ? new Date(row.cancelled_at).toISOString() : undefined,
+    events,
+    updatedAt: row.updated_at ? new Date(row.updated_at).toISOString() : undefined
+  };
+}
 
-  constructor() {
-    this.defaultPasswordHash = bcrypt.hashSync('Hunter@2026!', 10);
-    this.data = this.loadData();
-  }
+function rowToDeliveryBatch(row: any, orderIds: string[] = []): DeliveryBatch {
+  return {
+    id: row.id,
+    batchNumber: row.batch_number,
+    deliveryPartnerId: row.delivery_partner_id,
+    deliveryPartnerName: row.delivery_partner_name,
+    orderIds,
+    status: row.status,
+    createdAt: row.created_at ? new Date(row.created_at).toISOString() : new Date().toISOString(),
+    completedAt: row.completed_at ? new Date(row.completed_at).toISOString() : undefined
+  };
+}
 
-  private loadData(): DatabaseSchema {
-    try {
-      if (!fs.existsSync(DATA_DIR)) {
-        fs.mkdirSync(DATA_DIR, { recursive: true });
-      }
-      if (fs.existsSync(DB_FILE)) {
-        const fileContent = fs.readFileSync(DB_FILE, 'utf-8');
-        const db = JSON.parse(fileContent) as DatabaseSchema;
-        let changed = false;
-        const requiredCategories = [
-          { id: 'cat_noodles', name: 'Noodles', description: 'Delicious stir-fried street-style and wok-tossed noodles', icon: '🍜' },
-          { id: 'cat_rice', name: 'Rice Dishes', description: 'Fragrant basmati fried rice and traditional rice items', icon: '🍚' }
-        ];
-        if (!db.categories) db.categories = [];
-        for (const req of requiredCategories) {
-          if (!db.categories.some(c => c.id === req.id)) {
-            db.categories.push(req);
-            changed = true;
-          }
-        }
-        // Ensure auth credentials and seed users
-        const authChanged = this.ensureAuthCredentials(db);
-        if (authChanged) changed = true;
+function rowToReview(row: any): Review {
+  const parseJson = (val: any) => (typeof val === 'string' ? JSON.parse(val) : val || []);
+  return {
+    id: row.id,
+    orderId: row.order_id,
+    orderNumber: row.order_number,
+    customerId: row.customer_id,
+    customerName: row.customer_name,
+    foodRating: Number(row.food_rating),
+    deliveryRating: Number(row.delivery_rating),
+    overallRating: Number(row.overall_rating),
+    comment: row.comment || '',
+    createdAt: row.created_at ? new Date(row.created_at).toISOString() : new Date().toISOString(),
+    itemRatings: parseJson(row.item_ratings)
+  };
+}
 
-        // Ensure we have robust historical data for weekly trend & food category calculations
-        const seeded = this.ensureHistoricalOrders(db);
-        if (changed || seeded) {
-          fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 2), 'utf-8');
-        }
-        return db;
-      }
-    } catch (e) {
-      console.error('Error loading database file, initializing fallback:', e);
-    }
+function rowToNotification(row: any): AppNotification {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    userRole: row.user_role,
+    title: row.title,
+    message: row.message,
+    type: row.type,
+    isRead: row.is_read === true,
+    createdAt: row.created_at ? new Date(row.created_at).toISOString() : new Date().toISOString(),
+    orderId: row.order_id || undefined
+  };
+}
 
-    const initialDb: DatabaseSchema = {
-      settings: INITIAL_SETTINGS,
-      users: INITIAL_USERS,
-      categories: INITIAL_CATEGORIES,
-      menuItems: INITIAL_MENU_ITEMS,
-      orders: INITIAL_ORDERS,
-      deliveryBatches: [],
-      reviews: INITIAL_REVIEWS,
-      notifications: [],
-      addresses: INITIAL_ADDRESSES,
-      authCredentials: {}
-    };
+// -----------------------------------------------------------------------------
+// Production PostgreSQL Database Service
+// -----------------------------------------------------------------------------
 
-    this.ensureAuthCredentials(initialDb);
-    this.ensureHistoricalOrders(initialDb);
-    this.saveData(initialDb);
-    return initialDb;
-  }
-
-  private ensureAuthCredentials(db: DatabaseSchema): boolean {
-    let modified = false;
-    if (!db.users) db.users = [];
-    if (!db.authCredentials) {
-      db.authCredentials = {};
-      modified = true;
-    }
-
-    // Ensure all INITIAL_USERS exist in db.users
-    for (const initUser of INITIAL_USERS) {
-      const existing = db.users.find(u => u.id === initUser.id || u.email.toLowerCase() === initUser.email.toLowerCase());
-      if (!existing) {
-        db.users.push({ ...initUser, permissions: computeUserPermissions(initUser.role, initUser.staffRole) });
-        modified = true;
-      } else {
-        // Ensure staffRole and permissions are up-to-date
-        if (initUser.staffRole && existing.staffRole !== initUser.staffRole) {
-          existing.staffRole = initUser.staffRole;
-          modified = true;
-        }
-        if (!existing.permissions || existing.permissions.length === 0) {
-          existing.permissions = computeUserPermissions(existing.role, existing.staffRole);
-          modified = true;
-        }
-        if (!existing.restaurantId) {
-          existing.restaurantId = 'rest_hunter_01';
-          modified = true;
-        }
-      }
-    }
-
-    // Ensure all users have plain text password stripped and passwordHash created in authCredentials
-    for (const u of db.users) {
-      // If user object has raw password, hash it and remove plaintext
-      if ((u as any).password) {
-        const rawPass = (u as any).password;
-        if (!db.authCredentials[u.id] || !db.authCredentials[u.id].passwordHash) {
-          db.authCredentials[u.id] = {
-            userId: u.id,
-            email: u.email.toLowerCase().trim(),
-            passwordHash: bcrypt.hashSync(rawPass, 10)
-          };
-        }
-        delete (u as any).password;
-        modified = true;
-      }
-
-      // Ensure authCredentials exists for every user
-      if (!db.authCredentials[u.id]) {
-        db.authCredentials[u.id] = {
-          userId: u.id,
-          email: u.email.toLowerCase().trim(),
-          passwordHash: this.defaultPasswordHash,
-          inviteToken: u.id === 'usr_staff_invited' ? 'invite_chef_token_123' : undefined,
-          inviteExpires: u.id === 'usr_staff_invited' ? Date.now() + 7 * 24 * 60 * 60 * 1000 : undefined
-        };
-        modified = true;
-      }
-    }
-
-    // Ensure standard demo accounts always have valid Hunter@2026! hash
-    const standardDemoUserIds = ['usr_owner_1', 'usr_staff_1', 'usr_staff_2', 'usr_delivery_1', 'usr_customer_1', 'usr_customer_2', 'usr_staff_3', 'usr_staff_4', 'usr_suspended_1'];
-    for (const demoId of standardDemoUserIds) {
-      if (db.authCredentials[demoId]) {
-        const currentHash = db.authCredentials[demoId].passwordHash;
-        if (!currentHash || !bcrypt.compareSync('Hunter@2026!', currentHash)) {
-          db.authCredentials[demoId].passwordHash = this.defaultPasswordHash;
-          modified = true;
-        }
-      }
-    }
-
-    return modified;
-  }
-
-  private ensureHistoricalOrders(db: DatabaseSchema): boolean {
-    const deliveredOrders = db.orders.filter(o => o.status === 'DELIVERED');
-    if (deliveredOrders.length >= 10) {
-      return false; // Already has enough historical data
-    }
-
-    const mockCustomers = [
-      { id: 'usr_customer_1', name: 'Priya Sundaram', phone: '+91 99887 76655' },
-      { id: 'usr_customer_2', name: 'Rahul Sharma', phone: '+91 99887 76644' },
-      { id: 'usr_customer_3', name: 'Ananya Ramesh', phone: '+91 99887 76633' },
-      { id: 'usr_customer_4', name: 'Karthik Raja', phone: '+91 99887 76622' },
-      { id: 'usr_customer_5', name: 'Arun Kumar', phone: '+91 99887 76611' }
-    ];
-
-    const menuOptions = [
-      { id: 'item_101', name: "Hunter's Special Chicken Biriyani", price: 220, isVeg: false },
-      { id: 'item_102', name: "Mutton Seeraga Samba Biriyani", price: 320, isVeg: false },
-      { id: 'item_103', name: "Mushroom Dum Biriyani", price: 190, isVeg: true },
-      { id: 'item_104', name: "Chicken 65 Boneless", price: 220, isVeg: false },
-      { id: 'item_105', name: "Paneer Tikka Charcoal Grill", price: 190, isVeg: true },
-      { id: 'item_106', name: "Madurai Bun Parotta (2 Pcs)", price: 70, isVeg: true },
-      { id: 'item_107', name: "Ceylon Chicken Kothu Parotta", price: 160, isVeg: false }
-    ];
-
-    const addressTemplates = [
-      { id: 'addr_h_1', type: 'HOME', name: 'Home Address', phone: '+91 99887 76655', doorNo: '42-B', street: 'Greenways Road', area: 'Race Course', city: 'Coimbatore', pincode: '641018' },
-      { id: 'addr_h_2', type: 'OFFICE', name: 'Office Address', phone: '+91 99887 76644', doorNo: '108', street: 'Trichy Road', area: 'Ramanathapuram', city: 'Coimbatore', pincode: '641045' },
-      { id: 'addr_h_3', type: 'OTHER', name: 'Friends Place', phone: '+91 99887 76633', doorNo: '12', street: 'Avinashi Road', area: 'Peelamedu', city: 'Coimbatore', pincode: '641004' }
-    ];
-
-    const deliveryPartners = [
-      { id: 'usr_delivery_1', name: 'Arun Kumar', phone: '+91 91234 56789', vehicle: 'TN-37-AB-1234' },
-      { id: 'usr_delivery_2', name: 'Karthik Raja', phone: '+91 91234 56790', vehicle: 'TN-37-CD-5678' },
-      { id: 'usr_delivery_3', name: 'Vijay Anand', phone: '+91 91234 56791', vehicle: 'TN-37-EF-9012' }
-    ];
-
-    // Generate 35 completed orders spread across the last 14 days
-    const generatedOrders: Order[] = [];
-    const now = Date.now();
-
-    for (let i = 1; i <= 35; i++) {
-      const cust = mockCustomers[Math.floor(Math.random() * mockCustomers.length)];
-      const partner = deliveryPartners[i % deliveryPartners.length];
-      const numItems = Math.floor(Math.random() * 2) + 1;
-      const orderItems: any[] = [];
-      let subtotal = 0;
-
-      for (let j = 0; j < numItems; j++) {
-        const item = menuOptions[Math.floor(Math.random() * menuOptions.length)];
-        const existing = orderItems.find(oi => oi.menuItemId === item.id);
-        if (existing) {
-          existing.quantity += 1;
-          existing.totalPrice += item.price;
-          subtotal += item.price;
-        } else {
-          orderItems.push({
-            menuItemId: item.id,
-            name: item.name,
-            unitPrice: item.price,
-            quantity: 1,
-            isVeg: item.isVeg,
-            customizations: [],
-            addons: [],
-            totalPrice: item.price
-          });
-          subtotal += item.price;
-        }
-      }
-
-      const deliveryFee = subtotal >= 500 ? 0 : 35;
-      const tax = Math.round(subtotal * 0.05 * 10) / 10;
-      const grandTotal = subtotal + deliveryFee + tax;
-
-      // Distribute over the last 14 days
-      const daysAgo = Math.floor(Math.random() * 14) + 1; // 1 to 14 days ago
-      const orderTime = new Date(now - daysAgo * 24 * 60 * 60 * 1000 - Math.floor(Math.random() * 12 * 60 * 60 * 1000));
-      const deliveryTime = new Date(orderTime.getTime() + 1000 * 60 * (25 + Math.floor(Math.random() * 20)));
-
-      const orderNumDateStr = orderTime.toISOString().slice(0, 10).replace(/-/g, '');
-      const orderNumSeq = String(i).padStart(6, '0');
-      const orderId = `ord_hist_${i}`;
-      const orderNumber = `HK-${orderNumDateStr}-${orderNumSeq}`;
-
-      generatedOrders.push({
-        id: orderId,
-        orderNumber,
-        customerId: cust.id,
-        customerName: cust.name,
-        customerPhone: cust.phone,
-        deliveryAddress: addressTemplates[Math.floor(Math.random() * addressTemplates.length)] as any,
-        assignedDeliveryPartnerId: partner.id,
-        assignedDeliveryPartnerName: partner.name,
-        assignedDeliveryPartnerPhone: partner.phone,
-        assignedDeliveryPartnerVehicle: partner.vehicle,
-        items: orderItems,
-        subtotal,
-        deliveryFee,
-        tax,
-        discount: 0,
-        grandTotal,
-        paymentMethod: Math.random() > 0.3 ? 'ONLINE' : 'COD',
-        paymentStatus: 'PAID_CASH',
-        status: 'DELIVERED',
-        createdAt: orderTime.toISOString(),
-        deliveredAt: deliveryTime.toISOString(),
-        events: []
-      });
-
-      // Seed customer feedback reviews for about 40% of historical orders
-      if (i % 2.5 === 0 || i % 3 === 0) {
-        const feedBackComments = [
-          "Excellent and fast delivery!",
-          "Delivery partner was very polite and handled the food with care.",
-          "Amazing packaging, arrived super quick!",
-          "Very neat and professional service.",
-          "The food was piping hot when it arrived. Perfect delivery!",
-          "Super fast delivery, extremely friendly executive!"
-        ];
-        const rating = Math.floor(Math.random() * 2) + 4; // 4 or 5 star
-        db.reviews.push({
-          id: `rev_generated_${i}`,
-          orderId,
-          orderNumber,
-          customerId: cust.id,
-          customerName: cust.name,
-          foodRating: rating,
-          deliveryRating: rating,
-          overallRating: rating,
-          comment: feedBackComments[i % feedBackComments.length],
-          createdAt: deliveryTime.toISOString()
-        });
-      }
-    }
-
-    db.orders = [...generatedOrders, ...db.orders];
-    return true;
-  }
-
-  public saveData(dataToSave?: DatabaseSchema): void {
-    try {
-      if (dataToSave) {
-        this.data = dataToSave;
-      }
-      if (!fs.existsSync(DATA_DIR)) {
-        fs.mkdirSync(DATA_DIR, { recursive: true });
-      }
-      fs.writeFileSync(DB_FILE, JSON.stringify(this.data, null, 2), 'utf-8');
-    } catch (e) {
-      console.error('Error saving database file:', e);
-    }
-  }
-
+export class PostgresDatabaseService {
   // Settings
-  public getSettings(): RestaurantSettings {
-    return this.data.settings;
+  public async getSettings(): Promise<RestaurantSettings> {
+    const res = await postgresDb.query('SELECT * FROM restaurant_settings WHERE id = $1', ['rest_hunter_01']);
+    if (res.rows.length === 0) {
+      throw new Error('Restaurant settings record not found in PostgreSQL');
+    }
+    return rowToSettings(res.rows[0]);
   }
 
-  public updateSettings(updates: Partial<RestaurantSettings>): RestaurantSettings {
-    this.data.settings = { ...this.data.settings, ...updates };
-    this.saveData();
-    return this.data.settings;
+  public async updateSettings(updates: Partial<RestaurantSettings>): Promise<RestaurantSettings> {
+    const current = await this.getSettings();
+    const updated = { ...current, ...updates };
+
+    await postgresDb.query(
+      `UPDATE restaurant_settings SET
+        restaurant_name = $1, phone = $2, email = $3, address = $4,
+        is_open = $5, temporary_pause = $6, pause_reason = $7,
+        opening_time = $8, closing_time = $9, delivery_radius_km = $10,
+        base_delivery_fee = $11, free_delivery_threshold = $12,
+        cod_enabled = $13, online_payment_enabled = $14,
+        announcement = $15, updated_at = NOW()
+      WHERE id = $16`,
+      [
+        updated.restaurantName,
+        updated.phone,
+        updated.email,
+        updated.address,
+        updated.isOpen,
+        updated.temporaryPause,
+        updated.pauseReason || '',
+        updated.openingTime,
+        updated.closingTime,
+        updated.deliveryRadiusKm,
+        updated.baseDeliveryFee,
+        updated.freeDeliveryThreshold,
+        updated.codEnabled,
+        updated.onlinePaymentEnabled,
+        updated.announcement || '',
+        'rest_hunter_01'
+      ]
+    );
+
+    return updated;
   }
 
   // Users
-  public getUsers(): User[] {
-    return this.data.users.map((u) => ({
-      ...u,
-      partnerStatus: u.partnerStatus || (u.role === 'DELIVERY_PARTNER' && u.status === 'ACTIVE' ? 'ONLINE' : u.partnerStatus),
-      restaurantId: u.restaurantId || 'rest_hunter_01',
-      permissions: u.permissions && u.permissions.length > 0 ? u.permissions : computeUserPermissions(u.role, u.staffRole)
-    }));
+  public async getUsers(): Promise<User[]> {
+    const res = await postgresDb.query('SELECT * FROM users ORDER BY joined_at ASC');
+    return res.rows.map(rowToUser);
   }
 
-  public getUserById(id: string): User | undefined {
-    const user = this.data.users.find((u) => u.id === id);
-    if (!user) return undefined;
-    return {
-      ...user,
-      partnerStatus: user.partnerStatus || (user.role === 'DELIVERY_PARTNER' && user.status === 'ACTIVE' ? 'ONLINE' : user.partnerStatus),
-      restaurantId: user.restaurantId || 'rest_hunter_01',
-      permissions: user.permissions && user.permissions.length > 0 ? user.permissions : computeUserPermissions(user.role, user.staffRole)
-    };
+  public async getUserById(id: string): Promise<User | undefined> {
+    const res = await postgresDb.query('SELECT * FROM users WHERE id = $1', [id]);
+    if (res.rows.length === 0) return undefined;
+    return rowToUser(res.rows[0]);
   }
 
-  public getUserByEmail(email: string): User | undefined {
+  public async getUserByEmail(email: string): Promise<User | undefined> {
     const lower = email.toLowerCase().trim();
     let targetEmail = lower;
     if (lower === 'admin@hunterskitchen.com' || lower === 'owner@test.local') {
-      const defaultOwnerExists = this.data.users.some((u) => u.email.toLowerCase() === 'owner@hunterskitchen.com');
-      if (defaultOwnerExists) {
-        targetEmail = 'owner@hunterskitchen.com';
-      }
+      const defaultOwner = await postgresDb.query('SELECT 1 FROM users WHERE LOWER(email) = $1', ['owner@hunterskitchen.com']);
+      if (defaultOwner.rows.length > 0) targetEmail = 'owner@hunterskitchen.com';
+    } else if (lower === 'staff@hunterskitchen.com' || lower === 'staff@test.local') {
+      targetEmail = 'staff1@hunterskitchen.com';
+    } else if (lower === 'delivery@hunterskitchen.com' || lower === 'rider@test.local') {
+      targetEmail = 'delivery1@hunterskitchen.com';
+    } else if (lower === 'customer@hunterskitchen.com' || lower === 'customer@test.local') {
+      targetEmail = 'customer1@hunterskitchen.com';
+    } else if (lower === 'chef@test.local') {
+      targetEmail = 'chef@hunterskitchen.com';
+    } else if (lower === 'cook@test.local') {
+      targetEmail = 'cook@hunterskitchen.com';
     }
-    else if (lower === 'staff@hunterskitchen.com' || lower === 'staff@test.local') targetEmail = 'staff1@hunterskitchen.com';
-    else if (lower === 'delivery@hunterskitchen.com' || lower === 'rider@test.local') targetEmail = 'delivery1@hunterskitchen.com';
-    else if (lower === 'customer@hunterskitchen.com' || lower === 'customer@test.local') targetEmail = 'customer1@hunterskitchen.com';
-    else if (lower === 'chef@test.local') targetEmail = 'chef@hunterskitchen.com';
-    else if (lower === 'cook@test.local') targetEmail = 'cook@hunterskitchen.com';
 
-    const user = this.data.users.find((u) => u.email.toLowerCase() === targetEmail);
-    if (!user) return undefined;
-    return {
-      ...user,
-      restaurantId: user.restaurantId || 'rest_hunter_01',
-      permissions: user.permissions && user.permissions.length > 0 ? user.permissions : computeUserPermissions(user.role, user.staffRole)
-    };
+    const normalized = normalizeEmail(targetEmail);
+
+    const res = await postgresDb.query(
+      `SELECT * FROM users WHERE LOWER(email) = $1 OR (google_id IS NOT NULL AND LOWER(email) = $2) LIMIT 1`,
+      [targetEmail, normalized]
+    );
+
+    if (res.rows.length === 0) {
+      // Check dotless Gmail normalization
+      const allUsers = await postgresDb.query('SELECT * FROM users');
+      const found = allUsers.rows.find((u) => normalizeEmail(u.email) === normalized);
+      return found ? rowToUser(found) : undefined;
+    }
+
+    return rowToUser(res.rows[0]);
   }
 
-  public getUserByGoogleId(googleId: string): User | undefined {
+  public async getUserByGoogleId(googleId: string): Promise<User | undefined> {
     if (!googleId) return undefined;
-    const cleanId = String(googleId).trim();
-    const user = this.data.users.find((u) => u.googleId === cleanId);
-    if (!user) return undefined;
+    const res = await postgresDb.query('SELECT * FROM users WHERE google_id = $1 LIMIT 1', [googleId.trim()]);
+    if (res.rows.length === 0) return undefined;
+    return rowToUser(res.rows[0]);
+  }
+
+  // Auth Credentials
+  public async getAuthCredentialsByUserId(userId: string): Promise<UserAuthCredentials | undefined> {
+    const res = await postgresDb.query('SELECT * FROM user_auth_credentials WHERE user_id = $1', [userId]);
+    if (res.rows.length === 0) return undefined;
+    const r = res.rows[0];
     return {
-      ...user,
-      partnerStatus: user.partnerStatus || (user.role === 'DELIVERY_PARTNER' && user.status === 'ACTIVE' ? 'ONLINE' : user.partnerStatus),
-      restaurantId: user.restaurantId || 'rest_hunter_01',
-      permissions: user.permissions && user.permissions.length > 0 ? user.permissions : computeUserPermissions(user.role, user.staffRole)
+      userId: r.user_id,
+      email: r.email,
+      passwordHash: r.password_hash,
+      resetPasswordToken: r.reset_password_token || undefined,
+      resetPasswordExpires: r.reset_password_expires ? new Date(r.reset_password_expires).getTime() : undefined,
+      inviteToken: r.invite_token || undefined,
+      inviteExpires: r.invite_expires ? new Date(r.invite_expires).getTime() : undefined,
+      failedLoginAttempts: Number(r.failed_login_attempts || 0),
+      lastFailedLogin: r.last_failed_login ? new Date(r.last_failed_login).getTime() : undefined
     };
   }
 
-  public getAuthCredentialsByUserId(userId: string): UserAuthCredentials | undefined {
-    if (!this.data.authCredentials) this.data.authCredentials = {};
-    return this.data.authCredentials[userId];
-  }
-
-  public getAuthCredentialsByEmail(email: string): UserAuthCredentials | undefined {
-    if (!this.data.authCredentials) this.data.authCredentials = {};
-    const user = this.getUserByEmail(email);
+  public async getAuthCredentialsByEmail(email: string): Promise<UserAuthCredentials | undefined> {
+    const user = await this.getUserByEmail(email);
     if (!user) return undefined;
-    return this.data.authCredentials[user.id];
+    return this.getAuthCredentialsByUserId(user.id);
   }
 
-  public setAuthCredentials(cred: UserAuthCredentials): void {
-    if (!this.data.authCredentials) this.data.authCredentials = {};
-    this.data.authCredentials[cred.userId] = cred;
-    this.saveData();
+  public async setAuthCredentials(cred: UserAuthCredentials): Promise<void> {
+    await postgresDb.query(
+      `INSERT INTO user_auth_credentials (
+        user_id, email, password_hash, reset_password_token, reset_password_expires,
+        invite_token, invite_expires, failed_login_attempts, last_failed_login, updated_at
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
+      ON CONFLICT (user_id) DO UPDATE SET
+        email = EXCLUDED.email,
+        password_hash = EXCLUDED.password_hash,
+        reset_password_token = EXCLUDED.reset_password_token,
+        reset_password_expires = EXCLUDED.reset_password_expires,
+        invite_token = EXCLUDED.invite_token,
+        invite_expires = EXCLUDED.invite_expires,
+        failed_login_attempts = EXCLUDED.failed_login_attempts,
+        last_failed_login = EXCLUDED.last_failed_login,
+        updated_at = NOW()`,
+      [
+        cred.userId,
+        cred.email.toLowerCase().trim(),
+        cred.passwordHash,
+        cred.resetPasswordToken || null,
+        cred.resetPasswordExpires ? new Date(cred.resetPasswordExpires) : null,
+        cred.inviteToken || null,
+        cred.inviteExpires ? new Date(cred.inviteExpires) : null,
+        cred.failedLoginAttempts || 0,
+        cred.lastFailedLogin ? new Date(cred.lastFailedLogin) : null
+      ]
+    );
   }
 
-  public updatePassword(userId: string, passwordHash: string): boolean {
-    if (!this.data.authCredentials) this.data.authCredentials = {};
-    if (this.data.authCredentials[userId]) {
-      this.data.authCredentials[userId].passwordHash = passwordHash;
-      this.data.authCredentials[userId].resetPasswordToken = undefined;
-      this.data.authCredentials[userId].resetPasswordExpires = undefined;
-      this.saveData();
-      return true;
-    }
-    const user = this.getUserById(userId);
-    if (user) {
-      this.data.authCredentials[userId] = {
-        userId,
-        email: user.email.toLowerCase().trim(),
-        passwordHash
-      };
-      this.saveData();
-      return true;
-    }
-    return false;
+  public async updatePassword(userId: string, passwordHash: string): Promise<boolean> {
+    const res = await postgresDb.query(
+      `UPDATE user_auth_credentials SET
+        password_hash = $1, reset_password_token = NULL, reset_password_expires = NULL,
+        failed_login_attempts = 0, last_failed_login = NULL, updated_at = NOW()
+      WHERE user_id = $2`,
+      [passwordHash, userId]
+    );
+    return (res.rowCount || 0) > 0;
   }
 
-  public recordLoginAttempt(email: string, success: boolean): void {
-    const cred = this.getAuthCredentialsByEmail(email);
-    if (!cred) return;
+  public async recordLoginAttempt(email: string, success: boolean): Promise<void> {
+    const user = await this.getUserByEmail(email);
+    if (!user) return;
     if (success) {
-      cred.failedLoginAttempts = 0;
-      cred.lastFailedLogin = undefined;
+      await postgresDb.query(
+        `UPDATE user_auth_credentials SET failed_login_attempts = 0, last_failed_login = NULL, updated_at = NOW() WHERE user_id = $1`,
+        [user.id]
+      );
     } else {
-      cred.failedLoginAttempts = (cred.failedLoginAttempts || 0) + 1;
-      cred.lastFailedLogin = Date.now();
+      await postgresDb.query(
+        `UPDATE user_auth_credentials SET failed_login_attempts = failed_login_attempts + 1, last_failed_login = NOW(), updated_at = NOW() WHERE user_id = $1`,
+        [user.id]
+      );
     }
-    this.setAuthCredentials(cred);
   }
 
-  public setResetPasswordToken(email: string, token: string, expiryMs: number): boolean {
-    const cred = this.getAuthCredentialsByEmail(email);
-    if (!cred) return false;
-    cred.resetPasswordToken = token;
-    cred.resetPasswordExpires = Date.now() + expiryMs;
-    this.setAuthCredentials(cred);
-    return true;
+  public async setResetPasswordToken(email: string, token: string, expiryMs: number): Promise<boolean> {
+    const user = await this.getUserByEmail(email);
+    if (!user) return false;
+    const expiry = new Date(Date.now() + expiryMs);
+    const res = await postgresDb.query(
+      `UPDATE user_auth_credentials SET reset_password_token = $1, reset_password_expires = $2, updated_at = NOW() WHERE user_id = $3`,
+      [token, expiry, user.id]
+    );
+    return (res.rowCount || 0) > 0;
   }
 
-  public verifyAndConsumeResetToken(token: string, newHash: string): string | null {
-    if (!this.data.authCredentials) return null;
-    const now = Date.now();
-    for (const cred of Object.values(this.data.authCredentials)) {
-      if (cred.resetPasswordToken === token && cred.resetPasswordExpires && cred.resetPasswordExpires > now) {
-        cred.passwordHash = newHash;
-        cred.resetPasswordToken = undefined;
-        cred.resetPasswordExpires = undefined;
-        this.setAuthCredentials(cred);
-        return cred.userId;
-      }
+  public async verifyAndConsumeResetToken(token: string, newHash: string): Promise<string | null> {
+    const res = await postgresDb.query(
+      `UPDATE user_auth_credentials SET
+        password_hash = $1, reset_password_token = NULL, reset_password_expires = NULL,
+        failed_login_attempts = 0, last_failed_login = NULL, updated_at = NOW()
+      WHERE reset_password_token = $2 AND reset_password_expires > NOW()
+      RETURNING user_id`,
+      [newHash, token]
+    );
+    if (res.rows.length === 0) return null;
+    return res.rows[0].user_id;
+  }
+
+  public async createInviteToken(userId: string, token: string, expiryMs: number): Promise<boolean> {
+    const expiry = new Date(Date.now() + expiryMs);
+    const res = await postgresDb.query(
+      `UPDATE user_auth_credentials SET invite_token = $1, invite_expires = $2, updated_at = NOW() WHERE user_id = $3`,
+      [token, expiry, userId]
+    );
+    return (res.rowCount || 0) > 0;
+  }
+
+  public async acceptInvite(token: string, passwordHash: string): Promise<User | null> {
+    return postgresDb.transaction(async (client) => {
+      const credRes = await client.query(
+        `UPDATE user_auth_credentials SET
+          password_hash = $1, invite_token = NULL, invite_expires = NULL, updated_at = NOW()
+        WHERE invite_token = $2 AND invite_expires > NOW()
+        RETURNING user_id`,
+        [passwordHash, token]
+      );
+      if (credRes.rows.length === 0) return null;
+      const userId = credRes.rows[0].user_id;
+
+      const userRes = await client.query(
+        `UPDATE users SET status = 'ACTIVE', updated_at = NOW() WHERE id = $1 RETURNING *`,
+        [userId]
+      );
+      if (userRes.rows.length === 0) return null;
+      return rowToUser(userRes.rows[0]);
+    });
+  }
+
+  public async createUser(user: Omit<User, 'id' | 'joinedAt'> & { password?: string }): Promise<User> {
+    const id = `usr_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const permissions = user.permissions || computeUserPermissions(user.role, user.staffRole);
+    const passwordHash = user.password ? bcrypt.hashSync(user.password, 10) : bcrypt.hashSync('default_password_123', 10);
+
+    return postgresDb.transaction(async (client) => {
+      const userRes = await client.query(
+        `INSERT INTO users (
+          id, name, email, phone, role, staff_role, avatar, status, partner_status,
+          vehicle_number, vehicle_type, current_rating, total_deliveries, permissions,
+          restaurant_id, google_id, email_verified, joined_at
+        ) VALUES (
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, NOW()
+        ) RETURNING *`,
+        [
+          id,
+          user.name,
+          user.email.toLowerCase().trim(),
+          user.phone,
+          user.role,
+          user.staffRole || null,
+          user.avatar || null,
+          user.status || 'ACTIVE',
+          user.partnerStatus || (user.role === 'DELIVERY_PARTNER' ? 'ONLINE' : 'OFFLINE'),
+          user.vehicleNumber || null,
+          user.vehicleType || null,
+          user.currentRating !== undefined ? user.currentRating : (user.role === 'DELIVERY_PARTNER' ? 5.0 : null),
+          user.totalDeliveries || 0,
+          JSON.stringify(permissions),
+          user.restaurantId || 'rest_hunter_01',
+          user.googleId || null,
+          user.emailVerified === true
+        ]
+      );
+
+      await client.query(
+        `INSERT INTO user_auth_credentials (
+          user_id, email, password_hash, failed_login_attempts, created_at, updated_at
+        ) VALUES ($1, $2, $3, 0, NOW(), NOW())
+        ON CONFLICT (user_id) DO UPDATE SET email = EXCLUDED.email, password_hash = EXCLUDED.password_hash`,
+        [id, user.email.toLowerCase().trim(), passwordHash]
+      );
+
+      return rowToUser(userRes.rows[0]);
+    });
+  }
+
+  public async updateUser(id: string, updates: Partial<User>): Promise<User | undefined> {
+    const current = await this.getUserById(id);
+    if (!current) return undefined;
+
+    const name = updates.name !== undefined ? updates.name : current.name;
+    const email = updates.email !== undefined ? updates.email.toLowerCase().trim() : current.email;
+    const phone = updates.phone !== undefined ? updates.phone : current.phone;
+    const role = updates.role !== undefined ? updates.role : current.role;
+    const staffRole = updates.staffRole !== undefined ? updates.staffRole : current.staffRole;
+    const status = updates.status !== undefined ? updates.status : current.status;
+    const partnerStatus = updates.partnerStatus !== undefined ? updates.partnerStatus : current.partnerStatus;
+    const vehicleNumber = updates.vehicleNumber !== undefined ? updates.vehicleNumber : current.vehicleNumber;
+    const vehicleType = updates.vehicleType !== undefined ? updates.vehicleType : current.vehicleType;
+    const permissions = updates.permissions !== undefined ? updates.permissions : (current.permissions || computeUserPermissions(role, staffRole));
+
+    const res = await postgresDb.query(
+      `UPDATE users SET
+        name = $1, email = $2, phone = $3, role = $4, staff_role = $5, status = $6,
+        partner_status = $7, vehicle_number = $8, vehicle_type = $9, permissions = $10, updated_at = NOW()
+      WHERE id = $11 RETURNING *`,
+      [
+        name,
+        email,
+        phone,
+        role,
+        staffRole || null,
+        status,
+        partnerStatus || null,
+        vehicleNumber || null,
+        vehicleType || null,
+        JSON.stringify(permissions),
+        id
+      ]
+    );
+
+    if (updates.email) {
+      await postgresDb.query('UPDATE user_auth_credentials SET email = $1 WHERE user_id = $2', [email, id]);
     }
-    return null;
+
+    if (res.rows.length === 0) return undefined;
+    return rowToUser(res.rows[0]);
   }
 
-  public createInviteToken(userId: string, token: string, expiryMs: number): boolean {
-    const cred = this.getAuthCredentialsByUserId(userId);
-    if (!cred) return false;
-    cred.inviteToken = token;
-    cred.inviteExpires = Date.now() + expiryMs;
-    this.setAuthCredentials(cred);
-    return true;
+  public async deleteUser(id: string): Promise<boolean> {
+    return postgresDb.transaction(async (client) => {
+      // 1. Verify user exists
+      const userRes = await client.query('SELECT * FROM users WHERE id = $1', [id]);
+      if (userRes.rows.length === 0) return false;
+
+      // 2. Unassign from orders (staff or rider)
+      await client.query('UPDATE orders SET assigned_staff_id = NULL, assigned_staff_name = NULL WHERE assigned_staff_id = $1', [id]);
+      await client.query(
+        `UPDATE orders SET 
+          assigned_delivery_partner_id = NULL,
+          assigned_delivery_partner_name = NULL,
+          assigned_delivery_partner_phone = NULL,
+          assigned_delivery_partner_vehicle = NULL
+        WHERE assigned_delivery_partner_id = $1`,
+        [id]
+      );
+      await client.query('UPDATE orders SET customer_id = NULL WHERE customer_id = $1', [id]);
+
+      // 3. Remove delivery batches and batch associations
+      await client.query(
+        'DELETE FROM delivery_batch_orders WHERE batch_id IN (SELECT id FROM delivery_batches WHERE delivery_partner_id = $1)',
+        [id]
+      );
+      await client.query('DELETE FROM delivery_batches WHERE delivery_partner_id = $1', [id]);
+
+      // 4. Update COD transactions
+      await client.query('UPDATE cod_transactions SET delivery_partner_id = NULL WHERE delivery_partner_id = $1', [id]);
+      await client.query('UPDATE cod_transactions SET settled_by = NULL WHERE settled_by = $1', [id]);
+
+      // 5. Clean up child records
+      await client.query('DELETE FROM user_auth_credentials WHERE user_id = $1', [id]);
+      await client.query('DELETE FROM customer_addresses WHERE customer_id = $1', [id]);
+      await client.query('DELETE FROM notifications WHERE user_id = $1', [id]);
+      await client.query('UPDATE reviews SET customer_id = NULL WHERE customer_id = $1', [id]);
+
+      // 6. Delete primary user row
+      const res = await client.query('DELETE FROM users WHERE id = $1', [id]);
+      return (res.rowCount || 0) > 0;
+    });
   }
 
-  public acceptInvite(token: string, passwordHash: string): User | null {
-    if (!this.data.authCredentials) return null;
-    const now = Date.now();
-    for (const cred of Object.values(this.data.authCredentials)) {
-      if (cred.inviteToken === token && cred.inviteExpires && cred.inviteExpires > now) {
-        cred.passwordHash = passwordHash;
-        cred.inviteToken = undefined;
-        cred.inviteExpires = undefined;
-        this.setAuthCredentials(cred);
-        const user = this.getUserById(cred.userId);
-        if (user) {
-          user.status = 'ACTIVE';
-          this.updateUser(user.id, { status: 'ACTIVE' });
-          return user;
-        }
-      }
-    }
-    return null;
+  // Categories
+  public async getCategories(): Promise<Category[]> {
+    const res = await postgresDb.query('SELECT * FROM categories ORDER BY sort_order ASC, name ASC');
+    return res.rows.map(rowToCategory);
   }
 
-  public createUser(user: Omit<User, 'id' | 'joinedAt'> & { password?: string }): User {
-    // Enforce unique constraint on googleId (sub)
-    if (user.googleId) {
-      const existingGoogleUser = this.data.users.find((u) => u.googleId === user.googleId);
-      if (existingGoogleUser) {
-        throw new Error(`Google account identifier (sub) is already registered to user ${existingGoogleUser.id}`);
-      }
-    }
-
-    // Strip raw password from User entity to prevent plaintext storage
-    const { password: rawPassword, ...userWithoutPassword } = user;
-
-    const newUser: User = {
-      ...userWithoutPassword,
-      id: 'usr_' + Date.now() + '_' + Math.floor(Math.random() * 1000),
-      joinedAt: new Date().toISOString(),
-      restaurantId: userWithoutPassword.restaurantId || 'rest_hunter_01',
-      permissions: userWithoutPassword.permissions && userWithoutPassword.permissions.length > 0 ? userWithoutPassword.permissions : computeUserPermissions(userWithoutPassword.role, userWithoutPassword.staffRole)
-    };
-    this.data.users.push(newUser);
-    
-    // Set credentials with bcrypt hash
-    const hash = rawPassword ? bcrypt.hashSync(rawPassword, 10) : this.defaultPasswordHash;
-    if (!this.data.authCredentials) this.data.authCredentials = {};
-    this.data.authCredentials[newUser.id] = {
-      userId: newUser.id,
-      email: newUser.email.toLowerCase().trim(),
-      passwordHash: hash
-    };
-
-    this.saveData();
-    return newUser;
-  }
-
-  public updateUser(id: string, updates: Partial<User>): User | undefined {
-    const index = this.data.users.findIndex((u) => u.id === id);
-    if (index === -1) return undefined;
-
-    // Enforce unique constraint on googleId (sub)
-    if (updates.googleId) {
-      const existingGoogleUser = this.data.users.find((u) => u.googleId === updates.googleId && u.id !== id);
-      if (existingGoogleUser) {
-        throw new Error(`Google account identifier (sub) is already registered to another account`);
-      }
-    }
-
-    const updatedUser = { ...this.data.users[index], ...updates };
-    if (updates.role || updates.staffRole) {
-      updatedUser.permissions = computeUserPermissions(updatedUser.role, updatedUser.staffRole);
-    }
-    this.data.users[index] = updatedUser;
-
-
-    // Keep authCredentials synchronized if email is changed
-    if (updates.email && this.data.authCredentials && this.data.authCredentials[id]) {
-      this.data.authCredentials[id].email = updates.email.toLowerCase().trim();
-    }
-
-    this.saveData();
-    return this.getUserById(id);
-  }
-
-  public deleteUser(id: string): boolean {
-    const index = this.data.users.findIndex((u) => u.id === id);
-    if (index === -1) return false;
-    this.data.users.splice(index, 1);
-    if (this.data.authCredentials && this.data.authCredentials[id]) {
-      delete this.data.authCredentials[id];
-    }
-    this.saveData();
-    return true;
-  }
-
-  // Menu Categories
-  public getCategories(): Category[] {
-    return this.data.categories;
-  }
-
-  public createCategory(cat: Omit<Category, 'id'>): Category {
-    const newCat: Category = {
-      ...cat,
-      id: 'cat_' + Date.now()
-    };
-    this.data.categories.push(newCat);
-    this.saveData();
-    return newCat;
+  public async createCategory(cat: Omit<Category, 'id'>): Promise<Category> {
+    const id = `cat_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const res = await postgresDb.query(
+      `INSERT INTO categories (id, name, description, icon, item_count, sort_order)
+       VALUES ($1, $2, $3, $4, $5, (SELECT COALESCE(MAX(sort_order), 0) + 1 FROM categories))
+       RETURNING *`,
+      [id, cat.name, cat.description || '', cat.icon || '', cat.itemCount || 0]
+    );
+    return rowToCategory(res.rows[0]);
   }
 
   // Menu Items
-  public getMenuItems(): MenuItem[] {
-    return this.data.menuItems;
+  public async getMenuItems(): Promise<MenuItem[]> {
+    const res = await postgresDb.query('SELECT * FROM menu_items ORDER BY category_id ASC, name ASC');
+    return res.rows.map(rowToMenuItem);
   }
 
-  public getMenuItemById(id: string): MenuItem | undefined {
-    return this.data.menuItems.find((m) => m.id === id);
+  public async getMenuItemById(id: string): Promise<MenuItem | undefined> {
+    const res = await postgresDb.query('SELECT * FROM menu_items WHERE id = $1', [id]);
+    if (res.rows.length === 0) return undefined;
+    return rowToMenuItem(res.rows[0]);
   }
 
-  public createMenuItem(item: Omit<MenuItem, 'id' | 'rating' | 'ratingCount'>): MenuItem {
-    const newItem: MenuItem = {
-      ...item,
-      id: 'item_' + Date.now(),
-      rating: 5.0,
-      ratingCount: 1
-    };
-    this.data.menuItems.push(newItem);
-    this.saveData();
-    return newItem;
+  public async createMenuItem(item: Omit<MenuItem, 'id' | 'rating' | 'ratingCount'>): Promise<MenuItem> {
+    const id = `item_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    return postgresDb.transaction(async (client) => {
+      const res = await client.query(
+        `INSERT INTO menu_items (
+          id, name, description, category_id, category_name, price, discount_price,
+          image_url, is_veg, is_available, prep_time_minutes, is_popular, is_bestseller,
+          rating, rating_count, customizations, addons, ingredients
+        ) VALUES (
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, 5.0, 0, $14, $15, $16
+        ) RETURNING *`,
+        [
+          id,
+          item.name,
+          item.description || '',
+          item.categoryId,
+          item.categoryName,
+          Number(item.price),
+          item.discountPrice !== undefined ? Number(item.discountPrice) : null,
+          item.imageUrl || '',
+          item.isVeg !== false,
+          item.isAvailable !== false,
+          Number(item.prepTimeMinutes || 15),
+          item.isPopular === true,
+          item.isBestseller === true,
+          JSON.stringify(item.customizations || []),
+          JSON.stringify(item.addons || []),
+          JSON.stringify(item.ingredients || [])
+        ]
+      );
+
+      // Create initial inventory item
+      await client.query(
+        `INSERT INTO inventory_items (id, menu_item_id, available_quantity, is_unlimited)
+         VALUES ($1, $2, 100, true) ON CONFLICT (menu_item_id) DO NOTHING`,
+        [`inv_${id}`, id]
+      );
+
+      // Update category count
+      await client.query(
+        `UPDATE categories SET item_count = (SELECT COUNT(*) FROM menu_items WHERE category_id = $1) WHERE id = $1`,
+        [item.categoryId]
+      );
+
+      return rowToMenuItem(res.rows[0]);
+    });
   }
 
-  public updateMenuItem(id: string, updates: Partial<MenuItem>): MenuItem | undefined {
-    const index = this.data.menuItems.findIndex((m) => m.id === id);
-    if (index === -1) return undefined;
-    this.data.menuItems[index] = { ...this.data.menuItems[index], ...updates };
-    this.saveData();
-    return this.data.menuItems[index];
+  public async updateMenuItem(id: string, updates: Partial<MenuItem>): Promise<MenuItem | undefined> {
+    const current = await this.getMenuItemById(id);
+    if (!current) return undefined;
+
+    const merged = { ...current, ...updates };
+
+    const res = await postgresDb.query(
+      `UPDATE menu_items SET
+        name = $1, description = $2, category_id = $3, category_name = $4,
+        price = $5, discount_price = $6, image_url = $7, is_veg = $8,
+        is_available = $9, prep_time_minutes = $10, is_popular = $11,
+        is_bestseller = $12, customizations = $13, addons = $14,
+        ingredients = $15, updated_at = NOW()
+      WHERE id = $16 RETURNING *`,
+      [
+        merged.name,
+        merged.description,
+        merged.categoryId,
+        merged.categoryName,
+        Number(merged.price),
+        merged.discountPrice !== undefined ? Number(merged.discountPrice) : null,
+        merged.imageUrl,
+        merged.isVeg,
+        merged.isAvailable,
+        Number(merged.prepTimeMinutes || 15),
+        merged.isPopular,
+        merged.isBestseller,
+        JSON.stringify(merged.customizations || []),
+        JSON.stringify(merged.addons || []),
+        JSON.stringify(merged.ingredients || []),
+        id
+      ]
+    );
+
+    if (res.rows.length === 0) return undefined;
+    return rowToMenuItem(res.rows[0]);
   }
 
-  public deleteMenuItem(id: string): boolean {
-    const index = this.data.menuItems.findIndex((m) => m.id === id);
-    if (index === -1) return false;
-    this.data.menuItems.splice(index, 1);
-    this.saveData();
-    return true;
+  public async deleteMenuItem(id: string): Promise<boolean> {
+    const item = await this.getMenuItemById(id);
+    if (!item) return false;
+
+    return postgresDb.transaction(async (client) => {
+      await client.query('DELETE FROM inventory_items WHERE menu_item_id = $1', [id]);
+      const res = await client.query('DELETE FROM menu_items WHERE id = $1', [id]);
+      await client.query(
+        `UPDATE categories SET item_count = (SELECT COUNT(*) FROM menu_items WHERE category_id = $1) WHERE id = $1`,
+        [item.categoryId]
+      );
+      return (res.rowCount || 0) > 0;
+    });
   }
 
   // Customer Addresses
-  public getAddresses(customerId: string): Address[] {
-    if (!this.data.addresses) this.data.addresses = {};
-    return this.data.addresses[customerId] || [];
+  public async getAddresses(customerId: string): Promise<Address[]> {
+    const res = await postgresDb.query(
+      'SELECT * FROM customer_addresses WHERE customer_id = $1 ORDER BY is_default DESC, created_at DESC',
+      [customerId]
+    );
+    return res.rows.map(rowToAddress);
   }
 
-  public saveAddress(customerId: string, address: Omit<Address, 'id'>): Address {
-    if (!this.data.addresses) this.data.addresses = {};
-    if (!this.data.addresses[customerId]) {
-      this.data.addresses[customerId] = [];
-    }
-    const newAddr: Address = {
-      ...address,
-      id: 'addr_' + Date.now()
-    };
-    if (newAddr.isDefault) {
-      this.data.addresses[customerId].forEach((a) => (a.isDefault = false));
-    }
-    this.data.addresses[customerId].push(newAddr);
-    this.saveData();
-    return newAddr;
+  public async saveAddress(customerId: string, address: Omit<Address, 'id'>): Promise<Address> {
+    const id = `addr_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    return postgresDb.transaction(async (client) => {
+      if (address.isDefault) {
+        await client.query('UPDATE customer_addresses SET is_default = FALSE WHERE customer_id = $1', [customerId]);
+      }
+
+      const res = await client.query(
+        `INSERT INTO customer_addresses (
+          id, customer_id, type, name, phone, door_no, street, area, city, pincode,
+          landmark, instructions, coordinates, is_default
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+        RETURNING *`,
+        [
+          id,
+          customerId,
+          address.type || 'HOME',
+          address.name,
+          address.phone,
+          address.doorNo,
+          address.street,
+          address.area,
+          address.city,
+          address.pincode,
+          address.landmark || '',
+          address.instructions || '',
+          address.coordinates || '',
+          address.isDefault === true
+        ]
+      );
+
+      return rowToAddress(res.rows[0]);
+    });
   }
 
-  public updateAddress(customerId: string, addressId: string, updates: Partial<Address>): Address | undefined {
-    let targetList: Address[] | undefined = this.data.addresses[customerId];
-    let index = targetList ? targetList.findIndex((a) => a.id === addressId) : -1;
-
-    if (index === -1) {
-      for (const cid in this.data.addresses) {
-        const list = this.data.addresses[cid];
-        const idx = list.findIndex((a) => a.id === addressId);
-        if (idx !== -1) {
-          targetList = list;
-          index = idx;
-          break;
-        }
+  public async updateAddress(customerId: string, addressId: string, updates: Partial<Address>): Promise<Address | undefined> {
+    return postgresDb.transaction(async (client) => {
+      if (updates.isDefault) {
+        await client.query('UPDATE customer_addresses SET is_default = FALSE WHERE customer_id = $1', [customerId]);
       }
-    }
 
-    if (!targetList || index === -1) return undefined;
+      const existing = await client.query(
+        'SELECT * FROM customer_addresses WHERE id = $1 AND customer_id = $2',
+        [addressId, customerId]
+      );
+      if (existing.rows.length === 0) return undefined;
 
-    if (updates.isDefault) {
-      targetList.forEach((a) => (a.isDefault = false));
-    }
+      const merged = { ...rowToAddress(existing.rows[0]), ...updates };
 
-    targetList[index] = { ...targetList[index], ...updates };
-    this.saveData();
-    return targetList[index];
+      const res = await client.query(
+        `UPDATE customer_addresses SET
+          type = $1, name = $2, phone = $3, door_no = $4, street = $5, area = $6,
+          city = $7, pincode = $8, landmark = $9, instructions = $10, coordinates = $11,
+          is_default = $12, updated_at = NOW()
+        WHERE id = $13 AND customer_id = $14 RETURNING *`,
+        [
+          merged.type,
+          merged.name,
+          merged.phone,
+          merged.doorNo,
+          merged.street,
+          merged.area,
+          merged.city,
+          merged.pincode,
+          merged.landmark || '',
+          merged.instructions || '',
+          merged.coordinates || '',
+          merged.isDefault === true,
+          addressId,
+          customerId
+        ]
+      );
+
+      if (res.rows.length === 0) return undefined;
+      return rowToAddress(res.rows[0]);
+    });
   }
 
-  public deleteAddress(customerId: string, addressId: string): boolean {
-    let deleted = false;
-    if (this.data.addresses[customerId]) {
-      const idx = this.data.addresses[customerId].findIndex((a) => a.id === addressId);
-      if (idx !== -1) {
-        this.data.addresses[customerId].splice(idx, 1);
-        deleted = true;
-      }
-    }
-
-    if (!deleted) {
-      for (const cid in this.data.addresses) {
-        const list = this.data.addresses[cid];
-        const idx = list.findIndex((a) => a.id === addressId);
-        if (idx !== -1) {
-          list.splice(idx, 1);
-          deleted = true;
-          break;
-        }
-      }
-    }
-
-    if (deleted) {
-      this.saveData();
-    }
-    return deleted;
-  }
-
-  // Helper to ensure order partner details are populated
-  private populateOrderPartnerDetails(order: Order): Order {
-    if (!order) return order;
-    if (order.assignedDeliveryPartnerId && (!order.assignedDeliveryPartnerName || !order.assignedDeliveryPartnerPhone)) {
-      const partner = this.getUserById(order.assignedDeliveryPartnerId);
-      if (partner) {
-        order.assignedDeliveryPartnerName = partner.name;
-        order.assignedDeliveryPartnerPhone = partner.phone;
-        order.assignedDeliveryPartnerVehicle = partner.vehicleNumber || partner.vehicleType;
-      }
-    } else if (['ASSIGNED', 'PICKED_UP', 'OUT_FOR_DELIVERY', 'DELIVERED'].includes(order.status) && !order.assignedDeliveryPartnerName) {
-      const partner = this.data.users.find((u) => u.role === 'DELIVERY_PARTNER' && u.status === 'ACTIVE') ||
-                      this.data.users.find((u) => u.role === 'DELIVERY_PARTNER');
-      if (partner) {
-        order.assignedDeliveryPartnerId = order.assignedDeliveryPartnerId || partner.id;
-        order.assignedDeliveryPartnerName = partner.name;
-        order.assignedDeliveryPartnerPhone = partner.phone;
-        order.assignedDeliveryPartnerVehicle = partner.vehicleNumber || partner.vehicleType || 'Bike';
-      }
-    }
-    return order;
+  public async deleteAddress(customerId: string, addressId: string): Promise<boolean> {
+    const res = await postgresDb.query(
+      'DELETE FROM customer_addresses WHERE id = $1 AND customer_id = $2',
+      [addressId, customerId]
+    );
+    return (res.rowCount || 0) > 0;
   }
 
   // Orders
-  public getOrders(): Order[] {
-    return this.data.orders.map((o) => this.populateOrderPartnerDetails(o));
-  }
+  public async getOrders(): Promise<Order[]> {
+    const ordersRes = await postgresDb.query('SELECT * FROM orders ORDER BY created_at DESC');
+    if (ordersRes.rows.length === 0) return [];
 
-  public getOrderById(id: string): Order | undefined {
-    const order = this.data.orders.find((o) => o.id === id);
-    return order ? this.populateOrderPartnerDetails(order) : undefined;
-  }
+    const orderIds = ordersRes.rows.map((r) => r.id);
 
-  public createOrder(orderData: Omit<Order, 'id' | 'orderNumber' | 'createdAt' | 'events'>): Order {
-    const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-    
-    // Find highest numerical sequence across all existing orders to guarantee uniqueness
-    let maxSeq = 100;
-    this.data.orders.forEach((o) => {
-      if (o.orderNumber && o.orderNumber.includes('-')) {
-        const parts = o.orderNumber.split('-');
-        const lastPart = parts[parts.length - 1];
-        const num = parseInt(lastPart, 10);
-        if (!isNaN(num) && num > maxSeq) {
-          maxSeq = num;
-        }
-      }
-    });
-    const seqStr = String(maxSeq + 1).padStart(6, '0');
-    const orderNumber = `HK-${dateStr}-${seqStr}`;
-    const id = 'ord_' + Date.now();
+    const itemsRes = await postgresDb.query('SELECT * FROM order_items WHERE order_id = ANY($1)', [orderIds]);
+    const eventsRes = await postgresDb.query('SELECT * FROM order_events WHERE order_id = ANY($1) ORDER BY timestamp ASC', [orderIds]);
 
-    const newOrder: Order = {
-      ...orderData,
-      id,
-      orderNumber,
-      createdAt: new Date().toISOString(),
-      events: [
-        {
-          id: 'evt_' + Date.now(),
-          orderId: id,
-          status: orderData.status,
-          title: 'Order Placed',
-          description:
-            orderData.paymentMethod === 'ONLINE'
-              ? 'Order received & payment confirmed via Online Gateway'
-              : 'Order placed with Cash on Delivery',
-          timestamp: new Date().toISOString(),
-          changedBy: orderData.customerId,
-          changedByRole: 'CUSTOMER'
-        }
-      ]
-    };
-
-    this.data.orders.unshift(newOrder);
-
-    // Notify owner & staff
-    this.createNotification({
-      userId: 'usr_owner_1',
-      userRole: 'OWNER',
-      title: 'New Order Received!',
-      message: `Order #${orderNumber} placed by ${newOrder.customerName} (₹${newOrder.grandTotal})`,
-      type: 'ORDER',
-      orderId: newOrder.id
-    });
-
-    this.saveData();
-    return newOrder;
-  }
-
-  public updateOrderStatus(
-    orderId: string,
-    status: Order['status'],
-    changedBy: User,
-    metadata?: { rejectionReason?: string; cancellationReason?: string; deliveryPartnerId?: string }
-  ): Order | undefined {
-    const order = this.getOrderById(orderId);
-    if (!order) return undefined;
-
-    order.status = status;
-    order.version = (order.version || 1) + 1;
-    order.updatedAt = new Date().toISOString();
-    const now = new Date().toISOString();
-
-    let eventTitle = '';
-    let eventDesc = '';
-
-    switch (status) {
-      case 'ACCEPTED':
-        order.acceptedAt = now;
-        eventTitle = 'Order Accepted';
-        eventDesc = `Accepted by ${changedBy.name} (${changedBy.role})`;
-        break;
-      case 'REJECTED':
-        order.rejectionReason = metadata?.rejectionReason || 'Restaurant kitchen busy';
-        eventTitle = 'Order Rejected';
-        eventDesc = `Reason: ${order.rejectionReason}`;
-        break;
-      case 'PREPARING':
-        order.preparingAt = now;
-        eventTitle = 'Food Preparing';
-        eventDesc = 'Kitchen is actively preparing your dishes';
-        break;
-      case 'READY':
-        order.readyAt = now;
-        eventTitle = 'Food Ready';
-        eventDesc = 'Packaging completed & awaiting delivery assignment';
-        break;
-      case 'ASSIGNED':
-        {
-          const partnerId = metadata?.deliveryPartnerId || (changedBy?.role === 'DELIVERY_PARTNER' ? changedBy.id : undefined) || order.assignedDeliveryPartnerId;
-          let partner = partnerId ? this.getUserById(partnerId) : undefined;
-          if (!partner) {
-            partner = this.data.users.find((u) => u.role === 'DELIVERY_PARTNER' && u.status === 'ACTIVE') ||
-                      this.data.users.find((u) => u.role === 'DELIVERY_PARTNER');
-          }
-          if (partner) {
-            order.assignedDeliveryPartnerId = partner.id;
-            order.assignedDeliveryPartnerName = partner.name;
-            order.assignedDeliveryPartnerPhone = partner.phone;
-            order.assignedDeliveryPartnerVehicle = partner.vehicleNumber || partner.vehicleType;
-            
-            // Send notification to partner
-            this.createNotification({
-              userId: partner.id,
-              userRole: 'DELIVERY_PARTNER',
-              title: 'New Delivery Assigned!',
-              message: `Order #${order.orderNumber} assigned to you for delivery.`,
-              type: 'ORDER',
-              orderId: order.id
-            });
-          }
-          eventTitle = 'Delivery Partner Assigned';
-          eventDesc = `Assigned to ${order.assignedDeliveryPartnerName || 'Delivery Partner'}`;
-        }
-        break;
-      case 'PICKED_UP':
-        order.pickedUpAt = now;
-        eventTitle = 'Order Picked Up';
-        eventDesc = `${order.assignedDeliveryPartnerName} picked up your order from kitchen`;
-        break;
-      case 'OUT_FOR_DELIVERY':
-        eventTitle = 'Out for Delivery';
-        eventDesc = 'Delivery partner is on the way to your delivery address';
-        break;
-      case 'DELIVERED':
-        order.deliveredAt = now;
-        if (order.paymentMethod === 'COD') {
-          order.paymentStatus = 'PAID_CASH';
-        }
-        eventTitle = 'Order Delivered';
-        eventDesc = 'Delivered successfully. Bon appétit!';
-
-        // Notify customer to rate
-        this.createNotification({
-          userId: order.customerId,
-          userRole: 'CUSTOMER',
-          title: 'Order Delivered!',
-          message: `Order #${order.orderNumber} has been delivered. Please leave a rating!`,
-          type: 'ORDER',
-          orderId: order.id
-        });
-        break;
-      case 'CANCELLED':
-        order.cancelledAt = now;
-        order.cancellationReason = metadata?.cancellationReason || 'Cancelled by user';
-        eventTitle = 'Order Cancelled';
-        eventDesc = `Cancelled. ${order.cancellationReason}`;
-        break;
-    }
-
-    order.events.push({
-      id: 'evt_' + Date.now(),
-      orderId,
-      status,
-      title: eventTitle,
-      description: eventDesc,
-      timestamp: now,
-      changedBy: changedBy.id,
-      changedByRole: changedBy.role
-    });
-
-    // Notify customer about status change
-    if (status !== 'DELIVERED') {
-      this.createNotification({
-        userId: order.customerId,
-        userRole: 'CUSTOMER',
-        title: `${eventTitle}!`,
-        message: `Order #${order.orderNumber}: ${eventDesc}`,
-        type: 'ORDER',
-        orderId: order.id
+    const itemsByOrder = new Map<string, OrderItemSnapshot[]>();
+    for (const item of itemsRes.rows) {
+      if (!itemsByOrder.has(item.order_id)) itemsByOrder.set(item.order_id, []);
+      itemsByOrder.get(item.order_id)!.push({
+        menuItemId: item.menu_item_id,
+        name: item.name,
+        unitPrice: Number(item.unit_price),
+        quantity: Number(item.quantity),
+        isVeg: item.is_veg,
+        customizations: typeof item.customizations === 'string' ? JSON.parse(item.customizations) : item.customizations || [],
+        addons: typeof item.addons === 'string' ? JSON.parse(item.addons) : item.addons || [],
+        specialInstructions: item.special_instructions || '',
+        totalPrice: Number(item.total_price)
       });
     }
 
-    this.saveData();
-    return order;
+    const eventsByOrder = new Map<string, OrderEvent[]>();
+    for (const evt of eventsRes.rows) {
+      if (!eventsByOrder.has(evt.order_id)) eventsByOrder.set(evt.order_id, []);
+      eventsByOrder.get(evt.order_id)!.push({
+        id: evt.id,
+        orderId: evt.order_id,
+        status: evt.status,
+        title: evt.title,
+        description: evt.description,
+        timestamp: new Date(evt.timestamp).toISOString(),
+        changedBy: evt.changed_by,
+        changedByRole: evt.changed_by_role
+      });
+    }
+
+    return ordersRes.rows.map((r) => rowToOrder(r, itemsByOrder.get(r.id) || [], eventsByOrder.get(r.id) || []));
+  }
+
+  public async getOrderById(id: string): Promise<Order | undefined> {
+    const orderRes = await postgresDb.query('SELECT * FROM orders WHERE id = $1', [id]);
+    if (orderRes.rows.length === 0) return undefined;
+
+    const itemsRes = await postgresDb.query('SELECT * FROM order_items WHERE order_id = $1', [id]);
+    const eventsRes = await postgresDb.query('SELECT * FROM order_events WHERE order_id = $1 ORDER BY timestamp ASC', [id]);
+
+    const items: OrderItemSnapshot[] = itemsRes.rows.map((item) => ({
+      menuItemId: item.menu_item_id,
+      name: item.name,
+      unitPrice: Number(item.unit_price),
+      quantity: Number(item.quantity),
+      isVeg: item.is_veg,
+      customizations: typeof item.customizations === 'string' ? JSON.parse(item.customizations) : item.customizations || [],
+      addons: typeof item.addons === 'string' ? JSON.parse(item.addons) : item.addons || [],
+      specialInstructions: item.special_instructions || '',
+      totalPrice: Number(item.total_price)
+    }));
+
+    const events: OrderEvent[] = eventsRes.rows.map((evt) => ({
+      id: evt.id,
+      orderId: evt.order_id,
+      status: evt.status,
+      title: evt.title,
+      description: evt.description,
+      timestamp: new Date(evt.timestamp).toISOString(),
+      changedBy: evt.changed_by,
+      changedByRole: evt.changed_by_role
+    }));
+
+    return rowToOrder(orderRes.rows[0], items, events);
+  }
+
+  public async createOrder(orderData: Omit<Order, 'id' | 'orderNumber' | 'createdAt' | 'events'>): Promise<Order> {
+    const id = `ord_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+    const randomSuffix = Math.floor(100000 + Math.random() * 900000);
+    const orderNumber = `HK-${dateStr}-${randomSuffix}`;
+    const now = new Date().toISOString();
+
+    const initialEvent: OrderEvent = {
+      id: `evt_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      orderId: id,
+      status: orderData.status || 'PLACED',
+      title: 'Order Placed',
+      description: `Order #${orderNumber} placed successfully with total ₹${orderData.grandTotal}`,
+      timestamp: now,
+      changedBy: orderData.customerName || 'Customer',
+      changedByRole: 'CUSTOMER'
+    };
+
+    return postgresDb.transaction(async (client) => {
+      const orderRes = await client.query(
+        `INSERT INTO orders (
+          id, order_number, customer_id, customer_name, customer_phone, delivery_address,
+          order_notes, subtotal, delivery_fee, tax, discount, grand_total, payment_method,
+          payment_status, payment_transaction_id, cod_cash_tendered, cod_change_due,
+          status, rejection_reason, cancellation_reason, checklist, scheduled_slot,
+          version, created_at, updated_at
+        ) VALUES (
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17,
+          $18, $19, $20, $21, $22, 1, NOW(), NOW()
+        ) RETURNING *`,
+        [
+          id,
+          orderNumber,
+          orderData.customerId,
+          orderData.customerName,
+          orderData.customerPhone,
+          JSON.stringify(orderData.deliveryAddress),
+          orderData.orderNotes || '',
+          Number(orderData.subtotal),
+          Number(orderData.deliveryFee),
+          Number(orderData.tax),
+          Number(orderData.discount || 0),
+          Number(orderData.grandTotal),
+          orderData.paymentMethod,
+          orderData.paymentStatus,
+          orderData.paymentTransactionId || null,
+          orderData.codCashTendered ? Number(orderData.codCashTendered) : null,
+          orderData.codChangeDue ? Number(orderData.codChangeDue) : null,
+          orderData.status || 'PLACED',
+          orderData.rejectionReason || null,
+          orderData.cancellationReason || null,
+          orderData.checklist ? JSON.stringify(orderData.checklist) : null,
+          orderData.scheduledSlot ? JSON.stringify(orderData.scheduledSlot) : null
+        ]
+      );
+
+      // Insert order items
+      for (const item of orderData.items) {
+        await client.query(
+          `INSERT INTO order_items (
+            order_id, menu_item_id, name, unit_price, quantity, is_veg,
+            customizations, addons, special_instructions, total_price
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+          [
+            id,
+            item.menuItemId,
+            item.name,
+            Number(item.unitPrice),
+            Number(item.quantity),
+            item.isVeg !== false,
+            JSON.stringify(item.customizations || []),
+            JSON.stringify(item.addons || []),
+            item.specialInstructions || '',
+            Number(item.totalPrice)
+          ]
+        );
+      }
+
+      // Insert initial order event
+      await client.query(
+        `INSERT INTO order_events (id, order_id, status, title, description, timestamp, changed_by, changed_by_role)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+        [
+          initialEvent.id,
+          id,
+          initialEvent.status,
+          initialEvent.title,
+          initialEvent.description,
+          initialEvent.timestamp,
+          initialEvent.changedBy,
+          initialEvent.changedByRole
+        ]
+      );
+
+      return rowToOrder(orderRes.rows[0], orderData.items, [initialEvent]);
+    });
+  }
+
+  public async updateOrderStatus(
+    orderId: string,
+    status: OrderStatus,
+    actor: User,
+    metadata?: any
+  ): Promise<Order | undefined> {
+    return postgresDb.transaction(async (client) => {
+      // Row lock for strict concurrency protection
+      const currentRes = await client.query('SELECT * FROM orders WHERE id = $1 FOR UPDATE', [orderId]);
+      if (currentRes.rows.length === 0) return undefined;
+      const current = currentRes.rows[0];
+
+      let acceptedAt = current.accepted_at;
+      let preparingAt = current.preparing_at;
+      let readyAt = current.ready_at;
+      let pickedUpAt = current.picked_up_at;
+      let deliveredAt = current.delivered_at;
+      let cancelledAt = current.cancelled_at;
+
+      const now = new Date();
+      if (status === 'ACCEPTED' && !acceptedAt) acceptedAt = now;
+      if (status === 'PREPARING' && !preparingAt) preparingAt = now;
+      if (status === 'READY' && !readyAt) readyAt = now;
+      if (status === 'PICKED_UP' && !pickedUpAt) pickedUpAt = now;
+      if (status === 'DELIVERED' && !deliveredAt) deliveredAt = now;
+      if (status === 'CANCELLED' && !cancelledAt) cancelledAt = now;
+
+      let paymentStatus = current.payment_status;
+      if (status === 'DELIVERED' && current.payment_method === 'COD') {
+        paymentStatus = 'PAID_CASH';
+      }
+
+      const assignedPartnerId = metadata?.assignedDeliveryPartnerId !== undefined ? metadata.assignedDeliveryPartnerId : current.assigned_delivery_partner_id;
+      const assignedPartnerName = metadata?.assignedDeliveryPartnerName !== undefined ? metadata.assignedDeliveryPartnerName : current.assigned_delivery_partner_name;
+      const assignedPartnerPhone = metadata?.assignedDeliveryPartnerPhone !== undefined ? metadata.assignedDeliveryPartnerPhone : current.assigned_delivery_partner_phone;
+      const assignedPartnerVehicle = metadata?.assignedDeliveryPartnerVehicle !== undefined ? metadata.assignedDeliveryPartnerVehicle : current.assigned_delivery_partner_vehicle;
+
+      const orderRes = await client.query(
+        `UPDATE orders SET
+          status = $1, payment_status = $2, accepted_at = $3, preparing_at = $4,
+          ready_at = $5, picked_up_at = $6, delivered_at = $7, cancelled_at = $8,
+          assigned_delivery_partner_id = $9, assigned_delivery_partner_name = $10,
+          assigned_delivery_partner_phone = $11, assigned_delivery_partner_vehicle = $12,
+          rejection_reason = COALESCE($13, rejection_reason),
+          cancellation_reason = COALESCE($14, cancellation_reason),
+          cod_cash_tendered = COALESCE($15, cod_cash_tendered),
+          cod_change_due = COALESCE($16, cod_change_due),
+          checklist = COALESCE($17, checklist),
+          version = version + 1,
+          updated_at = NOW()
+        WHERE id = $18 RETURNING *`,
+        [
+          status,
+          paymentStatus,
+          acceptedAt,
+          preparingAt,
+          readyAt,
+          pickedUpAt,
+          deliveredAt,
+          cancelledAt,
+          assignedPartnerId,
+          assignedPartnerName,
+          assignedPartnerPhone,
+          assignedPartnerVehicle,
+          metadata?.rejectionReason || null,
+          metadata?.cancellationReason || null,
+          metadata?.codCashTendered ? Number(metadata.codCashTendered) : null,
+          metadata?.codChangeDue ? Number(metadata.codChangeDue) : null,
+          metadata?.checklist ? JSON.stringify(metadata.checklist) : null,
+          orderId
+        ]
+      );
+
+      // Add audit event
+      const eventId = `evt_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+      const title = metadata?.title || `Order ${status.replace(/_/g, ' ')}`;
+      const description = metadata?.description || `Status changed to ${status} by ${actor.name} (${actor.role})`;
+
+      await client.query(
+        `INSERT INTO order_events (id, order_id, status, title, description, timestamp, changed_by, changed_by_role)
+         VALUES ($1, $2, $3, $4, $5, NOW(), $6, $7)`,
+        [eventId, orderId, status, title, description, actor.name, actor.role]
+      );
+
+      // Track COD doorstep settlement
+      if (status === 'DELIVERED' && current.payment_method === 'COD') {
+        await client.query(
+          `INSERT INTO cod_transactions (
+            id, order_id, order_number, delivery_partner_id, amount_expected,
+            amount_collected, cash_tendered, change_due, collection_status,
+            settlement_status, collected_at
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'COLLECTED', 'UNSETTLED', NOW())
+          ON CONFLICT (order_id) DO UPDATE SET
+            collection_status = 'COLLECTED',
+            amount_collected = EXCLUDED.amount_collected,
+            cash_tendered = EXCLUDED.cash_tendered,
+            change_due = EXCLUDED.change_due,
+            collected_at = NOW()`,
+          [
+            `cod_${orderId}`,
+            orderId,
+            current.order_number,
+            assignedPartnerId || actor.id,
+            Number(current.grand_total),
+            Number(current.grand_total),
+            metadata?.codCashTendered ? Number(metadata.codCashTendered) : null,
+            metadata?.codChangeDue ? Number(metadata.codChangeDue) : null
+          ]
+        );
+      }
+
+      // Fetch updated items and events
+      const itemsRes = await client.query('SELECT * FROM order_items WHERE order_id = $1', [orderId]);
+      const eventsRes = await client.query('SELECT * FROM order_events WHERE order_id = $1 ORDER BY timestamp ASC', [orderId]);
+
+      const items: OrderItemSnapshot[] = itemsRes.rows.map((item) => ({
+        menuItemId: item.menu_item_id,
+        name: item.name,
+        unitPrice: Number(item.unit_price),
+        quantity: Number(item.quantity),
+        isVeg: item.is_veg,
+        customizations: typeof item.customizations === 'string' ? JSON.parse(item.customizations) : item.customizations || [],
+        addons: typeof item.addons === 'string' ? JSON.parse(item.addons) : item.addons || [],
+        specialInstructions: item.special_instructions || '',
+        totalPrice: Number(item.total_price)
+      }));
+
+      const events: OrderEvent[] = eventsRes.rows.map((evt) => ({
+        id: evt.id,
+        orderId: evt.order_id,
+        status: evt.status,
+        title: evt.title,
+        description: evt.description,
+        timestamp: new Date(evt.timestamp).toISOString(),
+        changedBy: evt.changed_by,
+        changedByRole: evt.changed_by_role
+      }));
+
+      return rowToOrder(orderRes.rows[0], items, events);
+    });
   }
 
   // Delivery Batches
-  public createDeliveryBatch(partnerId: string, orderIds: string[]): DeliveryBatch {
-    const partner = this.getUserById(partnerId);
-    const batchNumber = 'BATCH-' + Math.floor(100 + Math.random() * 900);
-    const batch: DeliveryBatch = {
-      id: 'batch_' + Date.now(),
-      batchNumber,
-      deliveryPartnerId: partnerId,
-      deliveryPartnerName: partner?.name || 'Delivery Partner',
-      orderIds,
-      status: 'ASSIGNED',
-      createdAt: new Date().toISOString()
-    };
+  public async createDeliveryBatch(partnerId: string, orderIds: string[]): Promise<DeliveryBatch> {
+    const partner = await this.getUserById(partnerId);
+    const id = `batch_${Date.now()}`;
+    const batchNumber = `BATCH-${Math.floor(100 + Math.random() * 900)}`;
 
-    this.data.deliveryBatches.unshift(batch);
+    return postgresDb.transaction(async (client) => {
+      const res = await client.query(
+        `INSERT INTO delivery_batches (id, batch_number, delivery_partner_id, delivery_partner_name, status, created_at)
+         VALUES ($1, $2, $3, $4, 'ASSIGNED', NOW()) RETURNING *`,
+        [id, batchNumber, partnerId, partner ? partner.name : 'Delivery Partner']
+      );
 
-    // Update each order
-    const dummyUser: User = partner || {
-      id: partnerId,
-      name: 'System',
-      email: '',
-      phone: '',
-      role: 'OWNER',
-      status: 'ACTIVE',
-      joinedAt: ''
-    };
-
-    orderIds.forEach((ordId) => {
-      const order = this.getOrderById(ordId);
-      if (order) {
-        order.batchId = batch.id;
-        this.updateOrderStatus(ordId, 'ASSIGNED', dummyUser, { deliveryPartnerId: partnerId });
+      for (let i = 0; i < orderIds.length; i++) {
+        await client.query(
+          `INSERT INTO delivery_batch_orders (batch_id, order_id, sequence_order) VALUES ($1, $2, $3)`,
+          [id, orderIds[i], i + 1]
+        );
+        await client.query(
+          `UPDATE orders SET
+            batch_id = $1, assigned_delivery_partner_id = $2, assigned_delivery_partner_name = $3,
+            assigned_delivery_partner_phone = $4, assigned_delivery_partner_vehicle = $5,
+            status = CASE WHEN status = 'READY' THEN 'ASSIGNED' ELSE status END,
+            updated_at = NOW()
+          WHERE id = $6`,
+          [
+            id,
+            partnerId,
+            partner ? partner.name : null,
+            partner ? partner.phone : null,
+            partner ? partner.vehicleNumber : null,
+            orderIds[i]
+          ]
+        );
       }
-    });
 
-    this.saveData();
-    return batch;
+      return rowToDeliveryBatch(res.rows[0], orderIds);
+    });
   }
 
-  public getDeliveryBatches(): DeliveryBatch[] {
-    return this.data.deliveryBatches;
+  public async getDeliveryBatches(): Promise<DeliveryBatch[]> {
+    const res = await postgresDb.query('SELECT * FROM delivery_batches ORDER BY created_at DESC');
+    if (res.rows.length === 0) return [];
+
+    const batchIds = res.rows.map((r) => r.id);
+    const ordersRes = await postgresDb.query(
+      'SELECT batch_id, order_id FROM delivery_batch_orders WHERE batch_id = ANY($1) ORDER BY sequence_order ASC',
+      [batchIds]
+    );
+
+    const ordersByBatch = new Map<string, string[]>();
+    for (const row of ordersRes.rows) {
+      if (!ordersByBatch.has(row.batch_id)) ordersByBatch.set(row.batch_id, []);
+      ordersByBatch.get(row.batch_id)!.push(row.order_id);
+    }
+
+    return res.rows.map((r) => rowToDeliveryBatch(r, ordersByBatch.get(r.id) || []));
   }
 
   // Reviews
-  public getReviews(): Review[] {
-    return this.data.reviews;
+  public async getReviews(): Promise<Review[]> {
+    const res = await postgresDb.query('SELECT * FROM reviews ORDER BY created_at DESC');
+    return res.rows.map(rowToReview);
   }
 
-  public getMenuItemReviews(menuItemId: string) {
-    const itemReviews: {
-      id: string;
-      customerName: string;
-      rating: number;
-      comment?: string;
-      createdAt: string;
-      orderNumber: string;
-    }[] = [];
+  public async getMenuItemReviews(menuItemId: string): Promise<Review[]> {
+    const all = await this.getReviews();
+    return all.filter((r) => r.itemRatings?.some((ir) => ir.menuItemId === menuItemId));
+  }
 
-    for (const rev of this.data.reviews) {
-      if (rev.itemRatings && rev.itemRatings.length > 0) {
-        const itemRatingMatch = rev.itemRatings.find((ir) => ir.menuItemId === menuItemId);
-        if (itemRatingMatch) {
-          itemReviews.push({
-            id: rev.id + '_' + menuItemId,
-            customerName: rev.customerName || 'Customer',
-            rating: itemRatingMatch.rating || rev.foodRating || 5,
-            comment: itemRatingMatch.comment || rev.comment,
-            createdAt: rev.createdAt,
-            orderNumber: rev.orderNumber
-          });
-          continue;
+  public async createReview(reviewData: Omit<Review, 'id' | 'createdAt'>): Promise<Review> {
+    const id = `rev_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    return postgresDb.transaction(async (client) => {
+      const res = await client.query(
+        `INSERT INTO reviews (
+          id, order_id, order_number, customer_id, customer_name, food_rating,
+          delivery_rating, overall_rating, comment, item_ratings, created_at
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW()) RETURNING *`,
+        [
+          id,
+          reviewData.orderId,
+          reviewData.orderNumber,
+          reviewData.customerId,
+          reviewData.customerName,
+          Number(reviewData.foodRating),
+          Number(reviewData.deliveryRating),
+          Number(reviewData.overallRating),
+          reviewData.comment || '',
+          JSON.stringify(reviewData.itemRatings || [])
+        ]
+      );
+
+      // Mark order as reviewed
+      await client.query('UPDATE orders SET has_been_reviewed = TRUE WHERE id = $1', [reviewData.orderId]);
+
+      // Update menu items rating average
+      if (Array.isArray(reviewData.itemRatings)) {
+        for (const ir of reviewData.itemRatings) {
+          if (ir.menuItemId && ir.rating) {
+            await client.query(
+              `UPDATE menu_items SET
+                rating = ((rating * rating_count) + $1) / (rating_count + 1),
+                rating_count = rating_count + 1
+              WHERE id = $2`,
+              [Number(ir.rating), ir.menuItemId]
+            );
+          }
         }
       }
 
-      // Check if order contained item
-      const order = this.getOrderById(rev.orderId);
-      if (order && order.items.some((i) => i.menuItemId === menuItemId)) {
-        itemReviews.push({
-          id: rev.id,
-          customerName: rev.customerName || 'Customer',
-          rating: rev.foodRating || rev.overallRating || 5,
-          comment: rev.comment,
-          createdAt: rev.createdAt,
-          orderNumber: rev.orderNumber
-        });
-      }
-    }
-
-    const menuItem = this.getMenuItemById(menuItemId);
-    const avgRating = menuItem ? menuItem.rating : (itemReviews.length > 0 ? Number((itemReviews.reduce((a, b) => a + b.rating, 0) / itemReviews.length).toFixed(1)) : 4.8);
-    const totalRatings = menuItem ? menuItem.ratingCount : itemReviews.length;
-
-    return {
-      avgRating,
-      totalRatings,
-      reviews: itemReviews
-    };
-  }
-
-  public createReview(reviewData: Omit<Review, 'id' | 'createdAt'>): Review {
-    const newRev: Review = {
-      ...reviewData,
-      id: 'rev_' + Date.now(),
-      createdAt: new Date().toISOString()
-    };
-
-    this.data.reviews.unshift(newRev);
-
-    // Mark order as reviewed
-    const order = this.getOrderById(reviewData.orderId);
-    if (order) {
-      order.hasBeenReviewed = true;
-
-      // Update menuItem star ratings
-      if (reviewData.itemRatings && reviewData.itemRatings.length > 0) {
-        reviewData.itemRatings.forEach((ir) => {
-          const mItem = this.getMenuItemById(ir.menuItemId);
-          if (mItem) {
-            const currentTotalScore = mItem.rating * mItem.ratingCount;
-            const newCount = mItem.ratingCount + 1;
-            const newAvg = Number(((currentTotalScore + ir.rating) / newCount).toFixed(1));
-            mItem.rating = newAvg;
-            mItem.ratingCount = newCount;
-          }
-        });
-      } else {
-        order.items.forEach((itemSnapshot) => {
-          const mItem = this.getMenuItemById(itemSnapshot.menuItemId);
-          if (mItem) {
-            const ratingVal = reviewData.foodRating || reviewData.overallRating || 5;
-            const currentTotalScore = mItem.rating * mItem.ratingCount;
-            const newCount = mItem.ratingCount + 1;
-            const newAvg = Number(((currentTotalScore + ratingVal) / newCount).toFixed(1));
-            mItem.rating = newAvg;
-            mItem.ratingCount = newCount;
-          }
-        });
-      }
-    } else {
-      // Direct item review submission (e.g. from FoodDetailModal)
-      if (reviewData.itemRatings && reviewData.itemRatings.length > 0) {
-        reviewData.itemRatings.forEach((ir) => {
-          const mItem = this.getMenuItemById(ir.menuItemId);
-          if (mItem) {
-            const currentTotalScore = mItem.rating * mItem.ratingCount;
-            const newCount = mItem.ratingCount + 1;
-            const newAvg = Number(((currentTotalScore + ir.rating) / newCount).toFixed(1));
-            mItem.rating = newAvg;
-            mItem.ratingCount = newCount;
-          }
-        });
-      }
-    }
-
-    this.saveData();
-    return newRev;
+      return rowToReview(res.rows[0]);
+    });
   }
 
   // Notifications
-  public getNotifications(userId: string): AppNotification[] {
-    return this.data.notifications.filter((n) => n.userId === userId);
+  public async getNotifications(userId: string): Promise<AppNotification[]> {
+    const res = await postgresDb.query(
+      'SELECT * FROM notifications WHERE user_id = $1 ORDER BY created_at DESC LIMIT 50',
+      [userId]
+    );
+    return res.rows.map(rowToNotification);
   }
 
-  public createNotification(notif: Omit<AppNotification, 'id' | 'isRead' | 'createdAt'>): AppNotification {
-    const newNotif: AppNotification = {
-      ...notif,
-      id: 'notif_' + Date.now() + '_' + Math.floor(Math.random() * 100),
-      isRead: false,
-      createdAt: new Date().toISOString()
-    };
-    this.data.notifications.unshift(newNotif);
-    this.saveData();
-    return newNotif;
+  public async createNotification(notif: Omit<AppNotification, 'id' | 'isRead' | 'createdAt'>): Promise<AppNotification> {
+    const id = `notif_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const res = await postgresDb.query(
+      `INSERT INTO notifications (id, user_id, user_role, title, message, type, is_read, order_id, created_at)
+       VALUES ($1, $2, $3, $4, $5, $6, FALSE, $7, NOW()) RETURNING *`,
+      [id, notif.userId, notif.userRole, notif.title, notif.message, notif.type || 'SYSTEM', notif.orderId || null]
+    );
+    return rowToNotification(res.rows[0]);
   }
 
-  public markNotificationAsRead(id: string): void {
-    const notif = this.data.notifications.find((n) => n.id === id);
-    if (notif) {
-      notif.isRead = true;
-      this.saveData();
-    }
+  public async markNotificationAsRead(id: string): Promise<void> {
+    await postgresDb.query('UPDATE notifications SET is_read = TRUE WHERE id = $1', [id]);
   }
 
-  // Analytics Computation
-  public getAnalytics(): AnalyticsSummary {
-    const orders = this.data.orders;
-    const completedOrders = orders.filter((o) => o.status === 'DELIVERED');
-    const cancelledOrders = orders.filter((o) => o.status === 'CANCELLED');
+  // Analytics Engine (Real-time SQL aggregation)
+  public async getAnalytics(): Promise<AnalyticsSummary> {
+    const ordersRes = await postgresDb.query('SELECT * FROM orders');
+    const reviewsRes = await postgresDb.query('SELECT * FROM reviews');
+    const usersRes = await postgresDb.query('SELECT * FROM users');
+    const menuItemsRes = await postgresDb.query('SELECT * FROM menu_items');
 
-    const today = new Date();
-    const todayStr = today.toDateString();
-    const sevenDaysAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
-    const thirtyDaysAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000);
+    const orders = ordersRes.rows.map((r) => rowToOrder(r));
+    const reviews = reviewsRes.rows.map(rowToReview);
+    const users = usersRes.rows.map(rowToUser);
+    const menuItems = menuItemsRes.rows.map(rowToMenuItem);
 
-    // Filter actual orders placed today
-    const ordersToday = orders.filter((o) => new Date(o.createdAt).toDateString() === todayStr);
-    const completedToday = completedOrders.filter((o) => new Date(o.createdAt).toDateString() === todayStr);
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-    const revenueToday = completedToday.reduce((sum, o) => sum + o.grandTotal, 0);
-    const totalOrdersToday = ordersToday.length;
-    const avgOrderValue = completedOrders.length > 0 
-      ? completedOrders.reduce((sum, o) => sum + o.grandTotal, 0) / completedOrders.length 
-      : 0;
+    const nonCancelled = orders.filter((o) => o.status !== 'CANCELLED' && o.status !== 'REJECTED');
 
-    // Actual revenue earned in the last 7 days (weekly)
-    const revenueWeekly = completedOrders
+    const revenueToday = nonCancelled
+      .filter((o) => new Date(o.createdAt) >= startOfToday)
+      .reduce((sum, o) => sum + o.grandTotal, 0);
+
+    const revenueWeekly = nonCancelled
       .filter((o) => new Date(o.createdAt) >= sevenDaysAgo)
       .reduce((sum, o) => sum + o.grandTotal, 0);
 
-    // Actual revenue earned in the last 30 days (monthly)
-    const revenueMonthly = completedOrders
+    const revenueMonthly = nonCancelled
       .filter((o) => new Date(o.createdAt) >= thirtyDaysAgo)
       .reduce((sum, o) => sum + o.grandTotal, 0);
 
-    const reviews = this.data.reviews;
-    const avgRating =
-      reviews.length > 0
-        ? reviews.reduce((sum, r) => sum + r.overallRating, 0) / reviews.length
-        : 4.8;
+    const totalOrdersToday = orders.filter((o) => new Date(o.createdAt) >= startOfToday).length;
+    const completedOrders = orders.filter((o) => o.status === 'DELIVERED').length;
+    const cancelledOrders = orders.filter((o) => o.status === 'CANCELLED' || o.status === 'REJECTED').length;
+    const avgOrderValue = nonCancelled.length > 0 ? nonCancelled.reduce((sum, o) => sum + o.grandTotal, 0) / nonCancelled.length : 0;
 
-    // Item sales map
-    const itemSalesMap: Record<string, { name: string; categoryName: string; units: number; revenue: number }> = {};
+    const avgRating = reviews.length > 0 ? reviews.reduce((sum, r) => sum + r.overallRating, 0) / reviews.length : 5.0;
 
-    orders.forEach((o) => {
-      if (o.status !== 'CANCELLED') {
-        o.items.forEach((item) => {
-          if (!itemSalesMap[item.menuItemId]) {
-            const menuObj = this.getMenuItemById(item.menuItemId);
-            itemSalesMap[item.menuItemId] = {
-              name: item.name,
-              categoryName: menuObj?.categoryName || 'Main Menu',
-              units: 0,
-              revenue: 0
-            };
-          }
-          itemSalesMap[item.menuItemId].units += item.quantity;
-          itemSalesMap[item.menuItemId].revenue += item.totalPrice;
-        });
-      }
-    });
+    const activeStaffCount = users.filter((u) => u.role === 'STAFF' && u.status === 'ACTIVE').length;
+    const activeDriverCount = users.filter((u) => u.role === 'DELIVERY_PARTNER' && u.partnerStatus === 'ONLINE').length;
 
-    const itemSales = Object.entries(itemSalesMap).map(([id, info]) => {
-      const menuObj = this.getMenuItemById(id);
-      return {
-        menuItemId: id,
-        name: info.name,
-        categoryName: info.categoryName,
-        unitsSold: info.units,
-        revenue: info.revenue,
-        rating: menuObj?.rating || 4.8
+    // Item sales aggregation from order items
+    const itemSalesMap: Record<string, { menuItemId: string; name: string; categoryName: string; unitsSold: number; revenue: number; rating: number }> = {};
+    for (const item of menuItems) {
+      itemSalesMap[item.id] = {
+        menuItemId: item.id,
+        name: item.name,
+        categoryName: item.categoryName,
+        unitsSold: 0,
+        revenue: 0,
+        rating: item.rating
       };
-    }).sort((a, b) => b.unitsSold - a.unitsSold);
-
-    // Peak hours
-    const hoursMap: Record<string, number> = {};
-    orders.forEach((o) => {
-      // Use deliveredAt timestamp for DELIVERED orders, fallback to createdAt
-      const timestampStr = o.status === 'DELIVERED' && o.deliveredAt ? o.deliveredAt : o.createdAt;
-      const date = new Date(timestampStr);
-      const hourNum = date.getHours();
-      let label = '';
-      if (hourNum === 12) label = '12 PM - 1 PM';
-      else if (hourNum === 13) label = '1 PM - 2 PM';
-      else if (hourNum === 14) label = '2 PM - 3 PM';
-      else if (hourNum === 19) label = '7 PM - 8 PM';
-      else if (hourNum === 20) label = '8 PM - 9 PM';
-      else if (hourNum === 21) label = '9 PM - 10 PM';
-      else {
-        const ampm = hourNum >= 12 ? 'PM' : 'AM';
-        const displayHour = hourNum % 12 || 12;
-        label = `${displayHour} ${ampm} - ${(displayHour % 12) + 1} ${ampm}`;
-      }
-      hoursMap[label] = (hoursMap[label] || 0) + 1;
-    });
-
-    const defaultPeakHours = [
-      { hour: '12 PM - 1 PM', count: 18 },
-      { hour: '1 PM - 2 PM', count: 24 },
-      { hour: '2 PM - 3 PM', count: 12 },
-      { hour: '7 PM - 8 PM', count: 22 },
-      { hour: '8 PM - 9 PM', count: 35 },
-      { hour: '9 PM - 10 PM', count: 28 }
-    ];
-
-    const peakHours = defaultPeakHours.map(pk => {
-      const liveCount = hoursMap[pk.hour] || 0;
-      return { hour: pk.hour, count: pk.count + liveCount };
-    });
-
-    // 1. Live Revenue by Day of the Week (Last 7 consecutive calendar days ending today)
-    const shortDayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    const last7Days: string[] = [];
-    const revenueByDayMap: Record<string, number> = {};
-
-    for (let i = 6; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      const dayName = shortDayNames[d.getDay()];
-      last7Days.push(dayName);
-      revenueByDayMap[dayName] = 0;
     }
 
-    orders.forEach((o) => {
-      if (o.status === 'DELIVERED') {
-        const date = new Date(o.createdAt);
-        const dayName = shortDayNames[date.getDay()];
-        if (dayName in revenueByDayMap) {
-          // Verify if order is within the last 7 calendar days window
-          const diffMs = Date.now() - date.getTime();
-          const diffDays = diffMs / (1000 * 60 * 60 * 24);
-          if (diffDays >= 0 && diffDays < 7) {
-            revenueByDayMap[dayName] += o.grandTotal;
-          }
-        }
+    const orderItemsRes = await postgresDb.query(
+      `SELECT oi.menu_item_id, oi.quantity, oi.total_price
+       FROM order_items oi
+       JOIN orders o ON oi.order_id = o.id
+       WHERE o.status NOT IN ('CANCELLED', 'REJECTED')`
+    );
+
+    for (const oi of orderItemsRes.rows) {
+      const target = itemSalesMap[oi.menu_item_id];
+      if (target) {
+        target.unitsSold += Number(oi.quantity);
+        target.revenue += Number(oi.total_price);
       }
-    });
+    }
 
-    const revenueByDay = last7Days.map(day => ({
-      day,
-      revenue: Math.round(revenueByDayMap[day])
-    }));
+    const itemSales = Object.values(itemSalesMap).sort((a, b) => b.unitsSold - a.unitsSold);
 
-    // 2. Orders Status Distribution
-    const statusCounts: Record<string, number> = {};
-    orders.forEach((o) => {
-      statusCounts[o.status] = (statusCounts[o.status] || 0) + 1;
-    });
+    const hourCounts: Record<string, number> = {};
+    for (let h = 0; h < 24; h++) {
+      const label = `${h === 0 ? 12 : h > 12 ? h - 12 : h} ${h >= 12 ? 'PM' : 'AM'}`;
+      hourCounts[label] = 0;
+    }
+    for (const o of orders) {
+      const h = new Date(o.createdAt).getHours();
+      const label = `${h === 0 ? 12 : h > 12 ? h - 12 : h} ${h >= 12 ? 'PM' : 'AM'}`;
+      hourCounts[label] = (hourCounts[label] || 0) + 1;
+    }
+    const peakHours = Object.entries(hourCounts).map(([hour, count]) => ({ hour, count }));
 
-    const totalOrders = orders.length || 1;
-    const ordersByStatus = Object.keys(statusCounts).map((status) => ({
-      status,
-      count: statusCounts[status],
-      percentage: Math.round((statusCounts[status] / totalOrders) * 100)
-    })).sort((a, b) => b.count - a.count);
-
-    // 3. Average Prep Time
-    let totalPrepTimeMs = 0;
-    let prepTimeCount = 0;
-    orders.forEach((o) => {
-      if (o.readyAt && o.createdAt) {
-        const diff = new Date(o.readyAt).getTime() - new Date(o.createdAt).getTime();
-        if (diff > 0 && diff < 1000 * 60 * 120) {
-          totalPrepTimeMs += diff;
-          prepTimeCount++;
-        }
-      } else if (o.deliveredAt && o.createdAt) {
-        const diff = new Date(o.deliveredAt).getTime() - new Date(o.createdAt).getTime();
-        const assumedPrep = Math.max(1000 * 60 * 5, diff - 1000 * 60 * 20);
-        if (assumedPrep > 0) {
-          totalPrepTimeMs += assumedPrep;
-          prepTimeCount++;
-        }
-      }
-    });
-    const avgPrepTimeMinutes = prepTimeCount > 0 
-      ? Math.round(totalPrepTimeMs / (prepTimeCount * 1000 * 60)) 
-      : 18;
-
-    // 4. Top Category Sales
-    const categorySalesMap: Record<string, number> = {};
-    orders.forEach((o) => {
-      if (o.status !== 'CANCELLED') {
-        o.items.forEach((item) => {
-          const cat = this.getMenuItemById(item.menuItemId)?.categoryName || 'Main Menu';
-          categorySalesMap[cat] = (categorySalesMap[cat] || 0) + item.totalPrice;
-        });
-      }
-    });
-
-    const totalSalesRev = Object.values(categorySalesMap).reduce((sum, v) => sum + v, 0) || 1;
-    const topCategorySales = Object.entries(categorySalesMap).map(([category, revenue]) => ({
-      category,
-      revenue: Math.round(revenue),
-      percentage: Math.round((revenue / totalSalesRev) * 100)
-    })).sort((a, b) => b.revenue - a.revenue);
-
-    const ratingDistribution = [
-      { rating: 5, count: reviews.filter((r) => r.overallRating === 5).length || 18 },
-      { rating: 4, count: reviews.filter((r) => r.overallRating === 4).length || 5 },
-      { rating: 3, count: reviews.filter((r) => r.overallRating === 3).length || 1 },
-      { rating: 2, count: 0 },
-      { rating: 1, count: 0 }
-    ];
-
-    const activeStaffCount = this.data.users.filter((u) => u.role === 'STAFF' && u.status === 'ACTIVE').length;
-    const activeDriverCount = this.data.users.filter((u) => u.role === 'DELIVERY_PARTNER' && u.partnerStatus === 'ONLINE').length;
+    const ratingBuckets: Record<number, number> = { 5: 0, 4: 0, 3: 0, 2: 0, 1: 0 };
+    for (const r of reviews) {
+      const rounded = Math.round(r.overallRating);
+      if (ratingBuckets[rounded] !== undefined) ratingBuckets[rounded]++;
+    }
+    const ratingDistribution = [5, 4, 3, 2, 1].map((r) => ({ rating: r, count: ratingBuckets[r] || 0 }));
 
     return {
-      revenueToday: Math.round(revenueToday),
-      revenueWeekly: Math.round(revenueWeekly),
-      revenueMonthly: Math.round(revenueMonthly),
+      revenueToday,
+      revenueWeekly,
+      revenueMonthly,
       totalOrdersToday,
-      avgOrderValue: Math.round(avgOrderValue),
-      completedOrders: completedOrders.length,
-      cancelledOrders: cancelledOrders.length,
-      avgRating: Number(avgRating.toFixed(1)),
+      avgOrderValue,
+      completedOrders,
+      cancelledOrders,
+      avgRating,
       activeStaffCount,
       activeDriverCount,
       itemSales,
       peakHours,
       ratingDistribution,
-      recentReviews: reviews.slice(0, 10),
-      revenueByDay,
-      ordersByStatus,
-      avgPrepTimeMinutes,
-      topCategorySales
+      recentReviews: reviews.slice(0, 10)
     };
   }
 }
 
-export const db = new Database();
+export const db = new PostgresDatabaseService();
