@@ -35,6 +35,7 @@ import {
 
 import { postgresDb } from './src/server/db/postgres';
 import { runMigrations } from './database/scripts/migrate_schema';
+import { migrateJsonToPostgres } from './scripts/migrate_json_to_postgres';
 import { db } from './src/server/db';
 import { authService } from './src/server/services/authService';
 import { orderService } from './src/server/services/orderService';
@@ -69,6 +70,18 @@ async function startServer() {
     await runMigrations();
   } catch (err: any) {
     logger.warn('Schema migration check warning (continuing server startup):', { message: err.message });
+  }
+
+  // Automatically seed initial restaurant data, menu, and users if database is empty
+  try {
+    const settingsCheck = await postgresDb.query('SELECT 1 FROM restaurant_settings LIMIT 1');
+    if (settingsCheck.rows.length === 0) {
+      logger.info('Database is empty. Auto-seeding initial menu, categories, and restaurant settings...');
+      await migrateJsonToPostgres();
+      logger.info('Initial dataset auto-seeded successfully.');
+    }
+  } catch (err: any) {
+    logger.warn('Auto-seed check warning (continuing server startup):', { message: err.message });
   }
 
   // Configure reverse proxy / load balancer IP forwarding

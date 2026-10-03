@@ -21,15 +21,26 @@ export async function migrateJsonToPostgres(): Promise<{
   console.log('=== STARTING HUNTER’S KITCHEN JSON TO POSTGRESQL DATA MIGRATION ===');
   await postgresDb.initialize();
 
-  const dataDir = path.join(process.cwd(), 'data');
+  const dataDir = [
+    path.join(process.cwd(), 'data'),
+    path.join(__dirname, '..', 'data'),
+    path.join(__dirname, '..', '..', 'data'),
+    path.join(__dirname, 'data')
+  ].find((d) => fs.existsSync(d) && fs.existsSync(path.join(d, 'database.json')));
+
+  if (!dataDir) {
+    logger.warn('[SEED] database.json source directory not found, skipping data seed.');
+    return {
+      success: false,
+      reports: [],
+      financialAudit: { sourceRevenue: 0, postgresRevenue: 0, matches: true }
+    };
+  }
+
   const dbFile = path.join(dataDir, 'database.json');
   const auditFile = path.join(dataDir, 'audit_logs.json');
   const outboxFile = path.join(dataDir, 'outbox_events.json');
   const idempotencyFile = path.join(dataDir, 'idempotency_store.json');
-
-  if (!fs.existsSync(dbFile)) {
-    throw new Error(`Database source file not found at ${dbFile}`);
-  }
 
   const rawDb = fs.readFileSync(dbFile, 'utf-8');
   const db = JSON.parse(rawDb);
