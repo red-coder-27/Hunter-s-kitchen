@@ -34,6 +34,7 @@ import {
 } from './src/server/middleware/auth';
 
 import { postgresDb } from './src/server/db/postgres';
+import { runMigrations } from './database/scripts/migrate_schema';
 import { db } from './src/server/db';
 import { authService } from './src/server/services/authService';
 import { orderService } from './src/server/services/orderService';
@@ -62,6 +63,13 @@ async function startServer() {
 
   // Initialize PostgreSQL Primary Connection Pool & Verification
   await postgresDb.initialize();
+
+  // Automatically execute any pending database schema migrations
+  try {
+    await runMigrations();
+  } catch (err: any) {
+    logger.warn('Schema migration check warning (continuing server startup):', { message: err.message });
+  }
 
   // Configure reverse proxy / load balancer IP forwarding
   app.set('trust proxy', true);

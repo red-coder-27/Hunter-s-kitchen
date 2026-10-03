@@ -79,6 +79,9 @@ export class PostgresDatabase {
   }
 
   private async ensureDatabaseExists(): Promise<void> {
+    if (config.databaseUrl) {
+      return;
+    }
     const adminPool = new Pool({
       host: config.dbHost,
       port: config.dbPort,

@@ -33,7 +33,7 @@ export interface ServerConfig {
 
 export function loadConfig(): ServerConfig {
   const env = (process.env.NODE_ENV || 'development') as 'development' | 'production' | 'test';
-  const port = 3000; // Fixed per container runtime environment
+  const port = parseInt(process.env.PORT || '3000', 10);
 
   const jwtSecret = process.env.JWT_SECRET || 'hunters_kitchen_jwt_secret_key_2026';
   const corsOrigins = process.env.CORS_ORIGINS ? process.env.CORS_ORIGINS.split(',') : ['*'];
@@ -49,8 +49,8 @@ export function loadConfig(): ServerConfig {
   const dbPassword = process.env.DB_PASSWORD || 'postgres';
   const dbPoolMin = parseInt(process.env.DB_POOL_MIN || '2', 10);
   const dbPoolMax = parseInt(process.env.DB_POOL_MAX || '20', 10);
-  const dbSsl = process.env.DB_SSL === 'true';
   const databaseUrl = process.env.DATABASE_URL || undefined;
+  const dbSsl = process.env.DB_SSL === 'true' || Boolean(databaseUrl && !databaseUrl.includes('localhost') && !databaseUrl.includes('127.0.0.1'));
 
   return {
     env,

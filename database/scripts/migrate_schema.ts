@@ -6,9 +6,16 @@ import { logger } from '../../src/server/utils/logger';
 export async function runMigrations(): Promise<void> {
   await postgresDb.initialize();
 
-  const migrationsDir = path.join(process.cwd(), 'database', 'migrations');
-  if (!fs.existsSync(migrationsDir)) {
-    throw new Error(`Migrations directory not found at ${migrationsDir}`);
+  const migrationsDir = [
+    path.join(process.cwd(), 'database', 'migrations'),
+    path.join(__dirname, '..', 'database', 'migrations'),
+    path.join(__dirname, '..', '..', 'database', 'migrations'),
+    path.join(__dirname, 'database', 'migrations')
+  ].find((d) => fs.existsSync(d));
+
+  if (!migrationsDir) {
+    logger.warn('[MIGRATION] Migrations directory not found, skipping schema check.');
+    return;
   }
 
   // Create schema_migrations tracker table if not present

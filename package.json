@@ -11,6 +11,9 @@
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
     "test:verification": "tsx scripts/verify-production.ts",
+    "db:migrate": "tsx database/scripts/migrate_schema.ts",
+    "db:seed": "tsx scripts/migrate_json_to_postgres.ts",
+    "db:setup": "tsx database/scripts/migrate_schema.ts && tsx scripts/migrate_json_to_postgres.ts",
     "db:view": "tsx scripts/view-database.ts",
     "db:verify": "tsx scripts/verify-postgres-production.ts"
   },
