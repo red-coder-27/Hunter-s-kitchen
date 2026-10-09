@@ -1051,7 +1051,7 @@ export const LoginPage: React.FC = () => {
                   <label className="block text-xs font-bold text-stone-700 mb-1 uppercase tracking-wider">
                     Address Type
                   </label>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     {[
                       { id: 'HOME', label: 'Home', icon: Home },
                       { id: 'WORK', label: 'Work', icon: Briefcase },

@@ -79,7 +79,7 @@ export const OwnerDashboard: React.FC<OwnerDashboardProps> = ({ onNavigateTab, o
       </div>
 
       {/* Real-time KPI Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <div className="bg-white p-4 sm:p-5 rounded-2xl border border-stone-200 shadow-2xs hover:shadow-xs transition-shadow">
           <p className="text-[10px] sm:text-xs font-extrabold text-stone-400 uppercase tracking-wider">Today's Revenue</p>
           <p className="text-xl sm:text-2xl font-black text-stone-900 mt-1">₹{analytics?.revenueToday || 0}</p>

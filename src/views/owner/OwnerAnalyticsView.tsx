@@ -135,7 +135,7 @@ export const OwnerAnalyticsView: React.FC = () => {
       {activeTab === 'OVERVIEW' && (
         <div className="space-y-4">
           {/* Executive Core Metrics */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             {/* Primary KPI Card: Today's Income */}
             <div className="bg-stone-900 text-white p-4 rounded-2xl shadow-sm border border-stone-800 relative overflow-hidden">
               <div className="absolute right-0 bottom-0 translate-x-3 translate-y-3 opacity-10">
@@ -351,7 +351,7 @@ export const OwnerAnalyticsView: React.FC = () => {
             </div>
 
             {analytics.ordersByStatus && analytics.ordersByStatus.length > 0 ? (
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {analytics.ordersByStatus.map((st) => (
                   <div key={st.status} className="p-3 bg-stone-50 border border-stone-200/60 rounded-xl space-y-1">
                     <div className="flex justify-between items-center">

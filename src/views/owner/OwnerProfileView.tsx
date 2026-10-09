@@ -937,7 +937,7 @@ export const OwnerProfileView: React.FC = () => {
               <Clock className="w-4 h-4 text-blue-600" /> Operational Hours & Delivery Pricing
             </h4>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="font-bold text-stone-700 block mb-1">Opening Time</label>
                 <input
@@ -958,7 +958,7 @@ export const OwnerProfileView: React.FC = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="font-bold text-stone-700 block mb-1">Base Delivery Fee (₹)</label>
                 <input

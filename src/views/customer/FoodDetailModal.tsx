@@ -312,7 +312,7 @@ export const FoodDetailModal: React.FC<FoodDetailModalProps> = ({ item, onClose,
                 item.customizations.map((cust) => (
                   <div key={cust.id} className="border-t border-stone-100 pt-3">
                     <h4 className="text-xs font-bold text-stone-900 mb-2 uppercase tracking-wide">{cust.name}</h4>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       {(cust.options || []).map((opt, i) => {
                         const isSelected = selectedCustomizations[cust.name]?.label === opt.label;
                         return (
