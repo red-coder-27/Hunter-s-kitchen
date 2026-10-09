@@ -62,11 +62,6 @@ export function extractToken(req: Request): string | null {
     return authHeader.substring(7).trim();
   }
 
-  // 3. Fallback check for query token (SSE event streams / websocket connect)
-  if (req.query && typeof req.query.token === 'string') {
-    return req.query.token;
-  }
-
   return null;
 }
 

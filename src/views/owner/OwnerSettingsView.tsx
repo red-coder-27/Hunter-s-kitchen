@@ -108,7 +108,7 @@ export const OwnerSettingsView: React.FC = () => {
   }, [activeSubTab]);
 
   return (
-    <div className="pb-28 md:pb-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-5">
+    <div className="pb-28 md:pb-10 w-full max-w-6xl mx-auto px-0 py-3 sm:py-5 space-y-4 sm:space-y-5">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-black text-stone-900">Admin Control & Operations</h2>

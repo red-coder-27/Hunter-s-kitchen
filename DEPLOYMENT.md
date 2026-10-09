@@ -6,12 +6,16 @@ This guide details the complete deployment process for **Hunter’s Kitchen**, c
 
 ## Architecture Overview
 
-- **Frontend**: React 19 + Vite + Tailwind CSS (compiled into static assets in `dist/`)
+- **Frontend**: React 19 + Vite + Tailwind CSS (optimized manual chunk splitting in `dist/assets/`)
 - **Backend**: Node.js + Express + TypeScript (bundled with `esbuild` into `dist/server.cjs`)
+- **Load Balancer**: Nginx reverse proxy with upstream balancing, HTTP/2, Gzip, and SSE streaming buffer bypass
 - **Primary Database**: PostgreSQL 18.x (ACID-compliant, migrations in `database/migrations/`)
-- **Cache & Rate Limiting**: Redis 7.x (automatic in-memory fallback if Redis is unavailable)
-- **Real-Time Stream**: Server-Sent Events (SSE) via `/api/events/stream`
-- **Background Workers**: Outbox Worker (`outboxWorker.ts`) and Idempotency Reaper
+- **Cache & Rate Limiting**: Redis 7.x (`ioredis` distributed rate limiting + atomic counters with resilient in-memory fallback)
+- **Real-Time Stream**: Multi-node Server-Sent Events (SSE) via `/api/events/stream` backed by Redis Pub/Sub
+- **Background Workers**: Distributed Outbox Worker with PostgreSQL `FOR UPDATE SKIP LOCKED` concurrency
+- **Webhooks**: Incoming payment callbacks (`/api/webhooks/payment`) + HMAC-signed outgoing webhook delivery
+- **Disaster Recovery**: Automated checksummed backup snapshots (`npm run db:backup` / `npm run db:restore`)
+- **CI/CD**: GitHub Actions automated pipeline (`.github/workflows/ci.yml`) testing lint, build, Postgres, Redis & Docker image
 
 ---
 

@@ -38,8 +38,10 @@ RUN npm ci --omit=dev && npm cache clean --force
 
 # Copy built distribution artifacts from builder stage
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/data ./data
 COPY --from=builder /app/database ./database
+
+# Run as non-root node user for container runtime security
+USER node
 
 # Expose application port
 EXPOSE 3000

@@ -131,7 +131,7 @@ export const DeliveryProfileView: React.FC = () => {
   };
 
   return (
-    <div className="pb-28 md:pb-10 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6 space-y-5">
+    <div className="pb-28 md:pb-10 w-full max-w-5xl mx-auto px-0 py-3 sm:py-5 space-y-4 sm:space-y-5">
       {/* Driver Header Card */}
       <div className="bg-gradient-to-r from-stone-900 to-stone-800 text-white p-5 rounded-3xl shadow-lg flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3.5">
