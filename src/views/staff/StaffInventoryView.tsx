@@ -170,7 +170,7 @@ export const StaffInventoryView: React.FC<StaffInventoryViewProps> = ({ onBack }
       </div>
 
       {/* Inventory KPI Summary Cards */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div className="bg-white rounded-2xl border border-stone-200 p-3.5 sm:p-4 shadow-3xs text-center">
           <span className="text-[10px] font-extrabold text-stone-400 uppercase tracking-tight block">
             Total Menu Items

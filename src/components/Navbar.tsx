@@ -469,7 +469,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     })}
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2 mt-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
                     <button
                       type="button"
                       onClick={handleStartAddViaLocation}
@@ -510,7 +510,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       ✕
                     </button>
                   </div>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <div>
                       <label className="text-[11px] font-bold text-stone-700">Type</label>
                       <select
