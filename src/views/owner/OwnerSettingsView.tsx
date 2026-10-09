@@ -164,7 +164,7 @@ export const OwnerSettingsView: React.FC = () => {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="font-bold text-stone-700">Support Phone</label>
                 <input
@@ -187,7 +187,7 @@ export const OwnerSettingsView: React.FC = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="font-bold text-stone-700">Base Delivery Fee (₹)</label>
                 <input
@@ -325,7 +325,7 @@ export const OwnerSettingsView: React.FC = () => {
 
             {reconciliationReport && (
               <div className="space-y-2 pt-1">
-                <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                   <div className="p-2.5 rounded-xl bg-stone-50 border border-stone-200">
                     <span className="text-[10px] text-stone-500 uppercase font-extrabold">Orders Audited</span>
                     <p className="text-base font-black text-stone-900">{reconciliationReport.totalOrdersAudited}</p>

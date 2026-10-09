@@ -341,7 +341,7 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({ activeTab = 'sta
         </div>
 
         {/* Station Quick Jump KPI Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {isBiller && (
             <button
               onClick={() => onNavigateTab?.('staff_order_desk')}
@@ -1127,7 +1127,7 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({ activeTab = 'sta
         {/* Courier fleet status summary */}
         <div className="bg-white rounded-2xl border border-stone-200 p-4 shadow-2xs space-y-3">
           <h4 className="font-black text-xs text-stone-900 uppercase tracking-wider">Fleet Summary</h4>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="p-3 bg-stone-50 rounded-xl border border-stone-100 text-center">
               <span className="text-xs font-bold text-stone-400 block uppercase">Active Drivers</span>
               <span className="text-xl font-black text-emerald-600">{deliveryPartners.length}</span>
@@ -1166,7 +1166,7 @@ export const StaffDashboard: React.FC<StaffDashboardProps> = ({ activeTab = 'sta
         {/* Terminal performance scorecard */}
         <div className="bg-white rounded-2xl border border-stone-200 p-4 shadow-2xs space-y-3">
           <h4 className="font-black text-xs text-stone-900 uppercase tracking-wider">Shift Stats</h4>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div className="p-3 bg-stone-50 rounded-xl border border-stone-100 text-center">
               <span className="text-[10px] font-bold text-stone-400 block uppercase">Total Dispatches</span>
               <span className="text-lg font-black text-stone-900">{deliveredOrders.length}</span>

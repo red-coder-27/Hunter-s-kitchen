@@ -1072,7 +1072,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                   })}
                 </div>
 
-                <div className="grid grid-cols-2 gap-3 pt-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
                   <button
                     type="button"
                     onClick={handleCheckoutStartAddViaLocation}
@@ -1111,7 +1111,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
               </div>
             ) : (
               <form onSubmit={handleAddNewAddressSubmit} className="space-y-3.5 text-sm">
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="font-bold text-stone-700 block mb-1 text-xs">Address Type</label>
                     <select
@@ -1147,7 +1147,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                     placeholder="+91 99887 76655"
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="font-bold text-stone-700 block mb-1 text-xs">Flat / Door No</label>
                     <input
@@ -1171,7 +1171,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
                     />
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="font-bold text-stone-700 block mb-1 text-xs">Area / Landmark</label>
                     <input

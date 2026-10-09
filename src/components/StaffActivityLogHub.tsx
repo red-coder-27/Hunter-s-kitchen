@@ -394,7 +394,7 @@ export const StaffActivityLogHub: React.FC = () => {
         </div>
 
         {/* Quick Summary Pill Badges */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
           <div className="p-2.5 rounded-2xl bg-stone-50 border border-stone-200/80">
             <span className="text-[10px] font-bold text-stone-500 uppercase tracking-wider block">Total Logged</span>
             <span className="text-lg font-black text-stone-900">{filteredActions.length}</span>

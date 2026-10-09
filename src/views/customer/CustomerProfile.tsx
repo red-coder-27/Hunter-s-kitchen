@@ -507,7 +507,7 @@ export const CustomerProfile: React.FC = () => {
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <div>
                 <label className="text-[10px] font-extrabold text-stone-600 uppercase block mb-1">Type</label>
                 <select
@@ -546,7 +546,7 @@ export const CustomerProfile: React.FC = () => {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <div>
                 <label className="text-[10px] font-extrabold text-stone-600 uppercase block mb-1">Area / Sector *</label>
                 <input
